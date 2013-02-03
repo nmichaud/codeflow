@@ -1,0 +1,29 @@
+# file types to ignore
+*.coverage
+*.pyc
+*.so
+*.xcodeproj
+*.dmg
+*.tar.gz
+*.bz2
+*.orig
+.DS_Store
+*~
+
+# ignore the build directories
+endist.dat
+*.egg-info/
+build/
+dist/
+upstream-eggs/
+docs/build/
+build_scripts/ensky/eggs
+build_scripts/ensky/dists.txt
+build_scripts/CanopyInstaller/CanopyInstaller.suo
+build_scripts/CanopyInstaller/bin/
+build_scripts/CanopyInstaller/obj/
+build_scripts/ensky/epd*
+build_scripts/ensky/test_collateral.tar
+
+# ignore cache directories
+__enamlcache__/

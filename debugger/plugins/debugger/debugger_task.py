@@ -5,7 +5,8 @@ from pyface.tasks.action.api import DockPaneToggleGroup, SMenuBar, \
     SMenu, SToolBar, TaskAction
 from pyface.api import ConfirmationDialog, FileDialog, \
     ImageResource, YES, OK, CANCEL
-from traits.api import on_trait_change, Property, Instance
+
+from traits.api import on_trait_change, Property, Instance, Bool
 
 # Local imports.
 from file_panes import PythonScriptBrowserPane
@@ -44,23 +45,28 @@ class DebuggerTask(Task):
                            TaskAction(method='save',
                                       tooltip='Save the current file',
                                       image=ImageResource('document_save')),
-                           image_size = (32, 32)),
+                           image_size = (24, 24)),
                   SToolBar(TaskAction(method='start_debugger',
                                       tooltip='Start debugger',
+                                      enabled_name = 'ready_to_debug',
                                       image=ImageResource('debugger_start')),
                            TaskAction(method='stop_debugger',
                                       tooltip='Stop debugger',
+                                      enabled_name = 'debugger_service.running',
                                       image=ImageResource('debugger_stop')),
                            TaskAction(method='step_over_line',
                                       tooltip='Step over next line',
+                                      enabled_name = 'debugger_running',
                                       image=ImageResource('debugger_step_over')),
                            TaskAction(method='step_into_line',
                                       tooltip='Step into next line',
+                                      enabled_name = 'debugger_running',
                                       image=ImageResource('debugger_step_into')),
                            TaskAction(method='step_out',
                                       tooltip='Step out of the current function',
+                                      enabled_name = 'debugger_running',
                                       image=ImageResource('debugger_step_out')),
-                           image_size = (32,32)),
+                           image_size = (24, 24)),
                 ]
 
     ###########################################################################
@@ -95,6 +101,14 @@ class DebuggerTask(Task):
     ###########################################################################
     # 'DebuggerTask' interface.
     ###########################################################################
+
+    debugger_service = Instance('debugger.plugins.debugger.debugger_service.DebuggerService')
+
+    debugger_running = Bool(False)
+    ready_to_debug = Property(Bool, depends_on='active_editor')
+
+    def _get_ready_to_debug(self):
+        return self.active_editor != None
 
     def new(self):
         """ Opens a new empty window
@@ -132,7 +146,7 @@ class DebuggerTask(Task):
     def start_debugger(self):
         """ Start debugging the current file
         """
-        pass
+        self.debugger_service.debug()
 
     def stop_debugger(self):
         """ Stop the currently running debug instance

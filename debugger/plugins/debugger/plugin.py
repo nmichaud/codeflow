@@ -25,6 +25,10 @@ class DebuggerPlugin(Plugin):
     # The plugin's name (suitable for displaying to the user).
     name = 'Debugger'
 
+    def stop(self):
+        if self._debugger_service:
+            self._debugger_service.stop_service()
+
     #### Contributions to extension points made by this plugin ################
 
     preferences = List(contributes_to=PREFERENCES)
@@ -55,13 +59,14 @@ class DebuggerPlugin(Plugin):
         return [service_offer]
 
     def _tasks_default(self):
-        from debugger_task import DebuggerTask
-
         return [ TaskFactory(id = 'debugger.debugger_task',
-                             factory = DebuggerTask),
+                             factory = self._create_debugger_task,
+                             )
                ]
 
     def _create_debugger_task(self):
+        from debugger_task import DebuggerTask
+
         from .debugger_service import DebuggerService
         service = self.application.get_service(DebuggerService)
         return DebuggerTask(debugger_service=service)
@@ -73,7 +78,7 @@ class DebuggerPlugin(Plugin):
         # Get the twisted reactor from the reactor plugin
         #reactor = self.application.get_service('plugins.twisted.ireactor.IReactorTCP')
         reactor = self.application.get_service(IReactorTCP)
-        service = DebuggerService(reactor=reactor)
+        self._debugger_service = service = DebuggerService(reactor=reactor)
         service.listen(8000)
         return service
 

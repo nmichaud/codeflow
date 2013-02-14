@@ -1,5 +1,10 @@
+# System imports
 import os, sys, subprocess, uuid
-from traits.api import HasTraits, Any, Event, Instance, Dict, List, Str, Bool, Int
+
+# Enthought library imports
+from traits.api import (
+    HasTraits, Any, Event, Instance, Dict, List, Str, Bool, Int
+    )
 
 
 class PythonProcess(HasTraits):
@@ -37,17 +42,16 @@ class PythonProcess(HasTraits):
     Id = property(lambda self: self._process.id)
     ProcessGuid = property(lambda self: self._processGuid)
 
-    def Start(self, startListening=True):
+    def Start(self, filename, startListening=True):
         # create process and start it
         exe = sys.executable
 
-        filename = 'test.py'
-
         args = [sys.executable,
-                os.path.join(os.path.dirname(__file__), '..', 'debuggee', 'visualstudio_py_launcher'),
+                os.path.join(os.path.dirname(__file__), '..', '..', 'debuggee', 'visualstudio_py_launcher.py'),
                 os.getcwd(),
-                8000,
-                self._processGuid,
+                '8000',
+                str(self._processGuid),
+                filename,
                 '--wait-on-exception',
                 '--wait-on-exit',
                 '--redirect-output',
@@ -59,19 +63,22 @@ class PythonProcess(HasTraits):
         #if startListening:
         #    self.startListening()
 
-    def ListenForConnection(self):
-        DebugConnectionListener.RegisterProcess(self._processGuid, self)
+    #def ListenForConnection(self):
+    #    DebugConnectionListener.RegisterProcess(self._processGuid, self)
 
-    def __del__(self):
-        DebugConnectionListener.UnregisterProcess(self._processGuid)
+    #def __del__(self):
+    #    DebugConnectionListener.UnregisterProcess(self._processGuid)
 
     def _process_Exited(self, sender, args):
         if not self._sentExited:
             self._sentExited = True
             exited = 1
 
-    def WaitForExit():
-        pass
+    def WaitForExit(self):
+        return self._process.wait()
+
+    def Terminate(self):
+        self._process.terminate()
 
     ProcessLoaded = Event
     ThreadCreated = Event

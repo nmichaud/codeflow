@@ -102,7 +102,7 @@ class DebuggerTask(Task):
     # 'DebuggerTask' interface.
     ###########################################################################
 
-    debugger_service = Instance('debugger.plugins.debugger.debugger_service.DebuggerService')
+    debugger_service = Instance('plugins.debugger.debugger_service.DebuggerService')
 
     debugger_running = Bool(False)
     ready_to_debug = Property(Bool, depends_on='active_editor')
@@ -146,12 +146,13 @@ class DebuggerTask(Task):
     def start_debugger(self):
         """ Start debugging the current file
         """
-        self.debugger_service.debug()
+        editor = self.active_editor
+        self.debugger_service.debug(editor.path)
 
     def stop_debugger(self):
         """ Stop the currently running debug instance
         """
-        pass
+        self.debugger_service.stop()
 
     def step_into_line(self):
         """ Step into the next line

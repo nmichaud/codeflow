@@ -1,22 +1,33 @@
 from twisted.internet.protocol import Factory, Protocol
+from twisted.internet.interfaces import IProtocol
+from zope.interface import implements
 
 # Enthought library imports
-from traits.api import HasTraits, Any, Bool
+from traits.api import HasTraits, Any, Bool, Instance
+
+# Local imports
+from python_process import PythonProcess
 
 class DebuggerService(HasTraits):
 
     reactor = Any()
 
     running = Bool(False)
+    process = Instance(PythonProcess)
+
+    def stop_service(self):
+        if self.process:
+            self.terminate()
 
     def listen(self, debug_port):
         self.reactor.listenTCP(debug_port, DebugFactory())
 
     def debug(self, filename):
-        pass
+        self.process = PythonProcess()
+        self.process.Start(filename)
 
-    def stop(self):
-        pass
+    def terminate(self):
+        self.process.Terminate()
 
 class DebugFactory(Factory):
     def __init__(self):

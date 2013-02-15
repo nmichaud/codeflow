@@ -143,10 +143,24 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
 
 
     def receive_ASBR(self, bytes):
-        " Async break"
+        """ Asynchronous break message
+
+        Data format:
+        ------------
+            break id: int
+        """
+        bid, = struct.unpack('i', bytes)
 
     def receive_SETL(self, bytes):
-        " Set line result"
+        """ Set line number message
+
+        Data format:
+        ------------
+            status: int
+            thread id: long
+            newline: int
+        """
+        status, tid, newline = struct.unpack('ili', bytes)
 
     def receive_THRF(self, bytes):
         """ Thread frame list message
@@ -192,7 +206,13 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         assert(len(bytes) == 0)
 
     def receive_DETC(self, bytes):
-        " Detach - Process exited"
+        """ Detach message (process exited)
+
+        Data format:
+        ------------
+            None
+        """
+        assert(len(bytes) == 0)
 
     def receive_NEWT(self, bytes):
         """ New thread created
@@ -205,13 +225,28 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         print tid
 
     def receive_EXTT(self, bytes):
-        " Thread exited"
+        """ Thread exited message
 
-    def receive_EXIT(self, bytes):
-        " not used"
+        Data format:
+        ------------
+            thread id: long
+        """
+        tid, = struct.unpack('l', bytes)
 
     def receive_EXCP(self, bytes):
-        " Exception"
+        """ Exception reported message
+
+        Data format:
+        ------------
+            name: string
+            thread id: long
+            break type: int
+            exception text: string
+        """
+        name, bytes = self._read_string(bytes)
+        tid, break_type = struct.unpack('li', bytes[:12])
+        excp_text, bytes = self._read_string(bytes[12:])
+        assert(len(bytes) == 0)
 
     def receive_MODL(self, bytes):
         """ Module loaded message
@@ -227,16 +262,41 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         assert(len(bytes) == 0)
 
     def receive_STPD(self, bytes):
-        " Step done"
+        """ Step done message
+
+        Data format:
+        ------------
+            thread id: long
+        """
+        tid, = struct.unpack('l', bytes)
 
     def receive_BRKS(self, bytes):
-        " Breakpoint set"
+        """ Breakpoint set message
+
+        Data format:
+        ------------
+            breakpoint id: int
+        """
+        bid, = struct.unpack('i', bytes)
 
     def receive_BRKF(self, bytes):
-        " Breakpoint failed"
+        """ Breakpoint failed message
+
+        Data format:
+        ------------
+            breakpoint id: int
+        """
+        bid, = struct.unpack('i', bytes)
 
     def receive_BRKH(self, bytes):
-        " Breakpoint hit"
+        """ Breakpoint hit message
+
+        Data format:
+        ------------
+            breakpoint id: int
+            thread id: long
+        """
+        bid, tid = struct.unpack('il', bytes)
 
     def receive_LOAD(self, bytes):
         """ Process loaded message
@@ -249,10 +309,29 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         print "Thread loaded", tid
 
     def receive_EXCE(self, bytes):
-        " Execution exception"
+        """ Execution error message
+
+        Data format:
+        ------------
+            execution id: int
+            exception text: string
+        """
+        eid, = struct.unpack('i', bytes[:4])
+        string, bytes = self._read_string(bytes[4:])
+        assert(len(bytes) == 0)
+
 
     def receive_EXCR(self, bytes):
-        " Execution result"
+        """ Execution result message
+
+        Data format:
+        ------------
+            execution id: int
+            result: object
+        """
+        eid, = struct.unpack('i', bytes[:4])
+        obj, bytes = self._read_object(bytes[4:])
+        assert(len(bytes) == 0)
 
     def receive_CHLD(self, bytes):
         """ Enumerate children
@@ -283,11 +362,26 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         assert(len(bytes) == 0)
 
     def receive_OUTP(self, bytes):
-        " Process output"
+        """ Process output message
+
+        Data format:
+        ------------
+            thread id: long
+            output: string
+        """
+        tid, = struct.unpack('l', bytes[:8])
+        output, bytes = self._read_string(bytes[8:])
+        assert(len(bytes) == 0)
 
     def receive_REQH(self, bytes):
-        " Request Handler"
+        """ Request handler message
 
+        Data format:
+        ------------
+            code_filename: string
+        """
+        fname, bytes = self._read_string(bytes)
+        assert(len(bytes) == 0)
 
     def _read_string(self, bytes):
         """ Reads a string out of bytes, returning the string

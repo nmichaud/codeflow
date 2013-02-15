@@ -1633,9 +1633,9 @@ def report_children(execution_id, attributes, indices, indices_are_index, indice
 def get_code_filename(code):
     return path.abspath(code.co_filename)
 
-NONEXPANDABLE_TYPES = [int, str, bool, float, object, type(None), unicode]
+NONEXPANDABLE_TYPES = set([int, str, bool, float, object, type(None), unicode])
 try:
-    NONEXPANDABLE_TYPES.append(long)
+    NONEXPANDABLE_TYPES.add(long)
 except NameError: pass
 
 def write_object(conn,obj_type, obj_repr, hex_repr, type_name, obj_len):

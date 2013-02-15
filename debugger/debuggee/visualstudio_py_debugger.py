@@ -1071,10 +1071,10 @@ class Thread(object):
                 write_string(conn,filename)
                 conn.send(struct.pack('i', argcount))
                 
-                conn.send(struct.pack('i', frameKind))
-                if frameKind == FRAME_KIND_DJANGO:
-                    write_string(conn,sourceFile)
-                    conn.send(struct.pack('i', sourceLine))
+                #conn.send(struct.pack('i', frameKind))
+                #if frameKind == FRAME_KIND_DJANGO:
+                #    write_string(conn,sourceFile)
+                #    conn.send(struct.pack('i', sourceLine))
                 
                 conn.send(struct.pack('i', len(variables)))
                 for name, type_obj, safe_repr_obj, hex_repr_obj, type_name, obj_len in variables:

@@ -164,6 +164,7 @@ else:
 cmd('').decode('utf8')
 ''.encode('utf8') # just in case they differ in what they import...
 
+CONN = cmd('CONN')
 ASBR = cmd('ASBR')
 SETL = cmd('SETL')
 THRF = cmd('THRF')
@@ -1681,9 +1682,10 @@ def attach_process(port_num, debug_id, report_and_block = False):
         try:
             conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             conn.connect(('127.0.0.1', port_num))
-            with _NetstringConn as conn:
-                write_string(conn,debug_id)
-                conn.send(struct.pack('!i', 0))  # success
+            with _NetstringConn as con:
+                con.send(CONN)
+                write_string(con,debug_id)
+                con.send(struct.pack('i', 0))  # success
             break
         except:
             import time

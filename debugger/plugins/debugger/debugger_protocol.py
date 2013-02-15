@@ -6,7 +6,7 @@ from twisted.protocols.basic import IntNStringReceiver
 from zope.interface import implements
 
 # Enthought library imports
-from traits.api import HasTraits, Enum
+from traits.api import HasTraits, Enum, Event
 
 class DebugFactory(Factory):
     def buildProtocol(self, addr):
@@ -19,6 +19,21 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
 
     state = Enum('disconnected', ['disconnected', 'connected', 'debugging'])
 
+    # Protocol events
+    processLoaded = Event()
+    processExited = Event()
+    threadCreated = Event()
+    threadExited = Event()
+    stepComplete = Event()
+    asyncBreakComplete = Event()
+    moduleLoaded = Event()
+    exceptionRaised = Event()
+    breakpointHit = Event()
+    breakpointBindSucceeded = Event()
+    breakpointBindFailed = Event()
+    setLineNoComplete = Event()
+    debuggerOutput = Event()
+
     structFormat = "I"
     prefixLength = struct.calcsize(structFormat)
 
@@ -26,10 +41,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         self.factory = factory
 
     def connectionMade(self):
-        pass
+        self.state = 'connected'
 
     def connectionLost(self, reason):
-        pass #print "connection lost", reason
+        self.state = 'disconnected'
 
     def stringReceived(self, msg):
         # Unpack the msg
@@ -109,7 +124,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             line number: int
         """
         self.transport.write('brkr')
-        self.transport.write(struct.pack('ii', brkpt_id, line_no))
+        self.transport.write(struct.pack('ii', line_no, brkpt_id))
 
     def send_BRKA(self):
         """ Break all command
@@ -277,12 +292,12 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         string, bytes = self._read_string(bytes)
         flag, = struct.unpack('i', bytes)
 
-        self.state = 'connected'
+        self.state = 'debugging'
 
         # Send default exception handling info
         # format: count, (mode, name) - name is something like 'Exception.KeyError'
         # Mode is either BREAK_MODE_NEVER (0), BREAK_MODE_ALWAYS(1), BREAK_MODE_UNHANDLED(32)
-
+        # XXX Ignore for now
 
     def receive_ASBR(self, bytes):
         """ Asynchronous break message
@@ -291,7 +306,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             break id: int
         """
-        bid, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('i', bytes)
+        self.asyncBreakComplete = brkpt_id
 
     def receive_SETL(self, bytes):
         """ Set line number message
@@ -302,7 +318,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
             newline: int
         """
-        status, tid, newline = struct.unpack('ili', bytes)
+        status, thread_id, newline = struct.unpack('ili', bytes)
+        self.setLineNoComplete = (status, thread_id, newline)
 
     def receive_THRF(self, bytes):
         """ Thread frame list message
@@ -328,10 +345,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                         type name: string
                         expandable: int
         """
-        tid, = struct.unpack('l', bytes[:8])
+        thread_id, = struct.unpack('l', bytes[:8])
         tname, bytes = self._read_string(bytes[8:])
         fcount, = struct.unpack('i', bytes[:4])
-        print 'Thread:',tid, tname
+        print 'Thread:',thread_id, tname
         bytes = bytes[4:]
         for f_i in range(fcount):
             flineno,lineno,curlineno = struct.unpack('iii', bytes[:12])
@@ -355,6 +372,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             None
         """
         assert(len(bytes) == 0)
+        self.processExited = True
 
     def receive_NEWT(self, bytes):
         """ New thread created
@@ -363,8 +381,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         -----------
             Thread ID: long
         """
-        tid, = struct.unpack('l', bytes)
-        print tid
+        thread_id, = struct.unpack('l', bytes)
+        self.threadCreated = thread_id
 
     def receive_EXTT(self, bytes):
         """ Thread exited message
@@ -373,7 +391,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        tid, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('l', bytes)
+        self.threadExited = thread_id
 
     def receive_EXCP(self, bytes):
         """ Exception reported message
@@ -386,9 +405,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             exception text: string
         """
         name, bytes = self._read_string(bytes)
-        tid, break_type = struct.unpack('li', bytes[:12])
+        thread_id, break_type = struct.unpack('li', bytes[:12])
         excp_text, bytes = self._read_string(bytes[12:])
         assert(len(bytes) == 0)
+        self.exceptionRaised = (thread_id, name, break_type, excp_text)
 
     def receive_MODL(self, bytes):
         """ Module loaded message
@@ -398,10 +418,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             Module id: long
             Module filename: string
         """
-        mid, = struct.unpack('l', bytes[:8])
+        module_id, = struct.unpack('l', bytes[:8])
         filename, bytes = self._read_string(bytes[8:])
-        print mid, filename
         assert(len(bytes) == 0)
+        self.moduleLoaded = (module_id, filename)
 
     def receive_STPD(self, bytes):
         """ Step done message
@@ -410,7 +430,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        tid, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('l', bytes)
+        self.stepComplete = True
 
     def receive_BRKS(self, bytes):
         """ Breakpoint set message
@@ -419,7 +440,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             breakpoint id: int
         """
-        bid, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('i', bytes)
+        self.breakpointBindSucceeded = brkpt_id
 
     def receive_BRKF(self, bytes):
         """ Breakpoint failed message
@@ -428,7 +450,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             breakpoint id: int
         """
-        bid, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('i', bytes)
+        self.breakpointBindFailed = brkpt_id
 
     def receive_BRKH(self, bytes):
         """ Breakpoint hit message
@@ -438,7 +461,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             breakpoint id: int
             thread id: long
         """
-        bid, tid = struct.unpack('il', bytes)
+        brkpt_id, thread_id = struct.unpack('il', bytes)
+        self.breakpointHit = (thread_id, brkpt_id)
 
     def receive_LOAD(self, bytes):
         """ Process loaded message
@@ -447,8 +471,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        tid, = struct.unpack('l', bytes)
-        print "Thread loaded", tid
+        thread_id, = struct.unpack('l', bytes)
+        self.processLoaded = (thread_id,)
 
     def receive_EXCE(self, bytes):
         """ Execution error message
@@ -461,7 +485,6 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         eid, = struct.unpack('i', bytes[:4])
         string, bytes = self._read_string(bytes[4:])
         assert(len(bytes) == 0)
-
 
     def receive_EXCR(self, bytes):
         """ Execution result message
@@ -511,9 +534,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
             output: string
         """
-        tid, = struct.unpack('l', bytes[:8])
+        thread_id, = struct.unpack('l', bytes[:8])
         output, bytes = self._read_string(bytes[8:])
         assert(len(bytes) == 0)
+        self.debuggerOutput = (thread_id, output)
 
     def receive_REQH(self, bytes):
         """ Request handler message

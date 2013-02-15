@@ -3,8 +3,11 @@ import os, sys, subprocess, uuid
 
 # Enthought library imports
 from traits.api import (
-    HasTraits, Any, Event, Instance, Dict, List, Str, Bool, Int
+    HasTraits, Any, Event, Instance, Dict, List, Unicode, Bool, Int
     )
+
+# Local imports
+from debugger_protocol import PyToolsProtocol
 
 
 class PythonProcess(HasTraits):
@@ -13,24 +16,21 @@ class PythonProcess(HasTraits):
     _threads = Dict #(int, PythonThread)
     _breakpoints = Dict #(int, PythonBreakpoint)
 
+    _protocol = Instance(PyToolsProtocol)
+
     #_lineEvent
     #_ids = Instance(IdDispenser)
     #_pendingExecutes
     #_pendingChildEnums
-
-    #_langVersion
 
     _processGuid = Instance(uuid.UUID)
 
     def __processGuid_default(self):
         return uuid.uuid4()
 
-    _dirMapping = List(Str)
-
-    _delayUnregister = Bool
+    _dirMapping = List(Unicode)
 
     _sentExited = Bool
-    _socket = Any #Instance(Socket)
     _breakpointCounter = Int
     _setLineResult = Bool
     _createdFirstThread = Bool
@@ -42,7 +42,7 @@ class PythonProcess(HasTraits):
     Id = property(lambda self: self._process.id)
     ProcessGuid = property(lambda self: self._processGuid)
 
-    def Start(self, filename, startListening=True):
+    def Start(self, filename):
         # create process and start it
         exe = sys.executable
 
@@ -58,21 +58,7 @@ class PythonProcess(HasTraits):
                 ]
 
         self._process = subprocess.Popen(args)
-
-        #self._process.Start()
-        #if startListening:
-        #    self.startListening()
-
-    #def ListenForConnection(self):
-    #    DebugConnectionListener.RegisterProcess(self._processGuid, self)
-
-    #def __del__(self):
-    #    DebugConnectionListener.UnregisterProcess(self._processGuid)
-
-    def _process_Exited(self, sender, args):
-        if not self._sentExited:
-            self._sentExited = True
-            exited = 1
+        # Wait for process to connect
 
     def WaitForExit(self):
         return self._process.wait()
@@ -80,51 +66,70 @@ class PythonProcess(HasTraits):
     def Terminate(self):
         self._process.terminate()
 
-    ProcessLoaded = Event
-    ThreadCreated = Event
-    ThreadExited = Event
-    StepComplete = Event
-    AsyncBreakComplete = Event
-    ProcessExited = Event
-    ModuleLoaded = Event
-    ExceptionRaised = Event
-    BreakpointHit = Event
-    BreakpointBindSucceeded = Event
-    BreakpointBindFailed = Event
-    DebuggerOutput = Event
+    # API used by other pieces
+    def SendStepInto(self, thread_id):
+        self._protocol.send_STPI(thread_id)
 
-    # Debugger commands
-    ExitCommandBytes = "exit"
-    StepIntoCommandBytes = "stpi"
-    StepOutCommandBytes = "stpo"
-    StepOverCommandBytes = "stpv"
-    BreakAllCommandBytes = "brka"
-    SetBreakPointCommandBytes = "brkp"
-    SetBreakPointConditionCommandBytes = "brkc"
-    RemoveBreakPointCommandBytes = "brkr"
-    ResumeAllCommandBytes = "resa"
-    GetThreadFramesCommandBytes = "thrf"
-    ExecuteTextCommandBytes = "exec"
-    ResumeThreadCommandBytes = "rest"
-    ClearSteppingCommandBytes = "clst"
-    SetLineNumberCommand = "setl"
-    GetChildrenCommandBytes = "chld"
-    DetachCommandBytes = "detc"
-    SetExceptionInfoCommandBytes = "sexi"
-    SetExceptionHandlerInfoCommandBytes = "sehi"
-    RemoveDjangoBreakPointCommandBytes = "bkdr"
-    AddDjangoBreakPointCommandBytes = "bkda"
-    ConnectReplCommandBytes = "crep"
-    DisconnectReplCommandBytes = "drep"
+    def SendStepOver(self, thread_id):
+        self._protocol.send_STPV(thread_id)
+
+    def SendStepOut(self, thread_id):
+        self._protocol.send_STPO(thread_id)
+
+    def SendResumeThread(self, thread_id):
+        self._protocol.send_REST(thread_id)
+
+    def SendClearStepping(self, thread_id):
+        self._protocol.send_CLST(thread_id)
+
+    def Resume(self):
+        self._protocol.send_RESA()
+
+    def Break(self):
+        self._protocol.send_BRKA()
+
+    def BindBreakPoint(self, breakpoint):
+        self._protocol.send_BRKP(
+            breakpoint.Id, breakpoint.LineNo, breakpoint.Filename,
+            breakpoint.Condition, breakpoint.BreakWhenChanged
+            )
+
+    def RemoveBreakPoint(self, breakpoint):
+        self._breakpoints.pop(breakpoint.Id)
+        self.DisableBreakPoint(breakpoint)
+
+    def DisableBreakPoint(self, breakpoint):
+        self._protocol.send_BRKR(
+            breakpoint.Id, breakpoint.LineNo
+            )
+
+    def SetBreakPointCondition(self, breakpoint):
+        self._protocol.send_BRKC(
+            breakpoint.Id, breakpoint.Condition,
+            breakpoint.BreakWhenChanged
+            )
+
+    def SetLineNumber(self, frame, lineNo):
+        self._protocol.send_SETL(
+            frame.Thread.Id, frame.FrameId, LineNo
+            )
+
+    def ExecuteText(self, frame, completion):
+        # XXX Create an execution id
+        executionId = 0
+        self._protocol.send_EXEC(
+            completion, frame.Thread.Id, frame.FrameId,
+            executionId)
 
 
 class PythonEvaluationResult(HasTraits):
     pass
 
+
 class PythonStackFrame(HasTraits):
     _lineNo = Int
-    _frameName = Str
-    _filename = Str
+    _frameName = Unicode
+    _filename = Unicode
     _argCount = Int
     _frameId = Int
     _startLine = Int
@@ -158,16 +163,17 @@ class PythonStackFrame(HasTraits):
     def SetLineNumber(self, lineNo):
         return self._thread.Process.SetLineNumber(self, lineNo)
 
+
 class PythonThread(HasTraits):
     _identity = Int
     _process = Instance(PythonProcess)
     _isWorkerThread = Bool
-    _name = Str
+    _name = Unicode
     _frames = List(Instance(PythonStackFrame))
 
     Process = property(lambda self: self._process)
     Name = property(lambda self: self._name, lambda self, val: self.trait_set(_name=val))
-    Id = property(lambda self: self._id)
+    Id = property(lambda self: self._identity)
     IsWorkerThread = property(lambda self: self._isWorkerThread)
     Frames = property(lambda self: self._frames, lambda self, val: self.trait_set(_frames, val))
 
@@ -182,18 +188,20 @@ class PythonThread(HasTraits):
     def ClearSteppingState(self):
         self._process.SendClearStepping(self._identity)
 
+
 PythonStackFrame.add_class_trait('_thread', Instance(PythonThread))
+
 
 class PythonBreakpoint(HasTraits):
     _process = Instance(PythonProcess)
-    _filename = Str
+    _filename = Unicode
     _lineNo = Int
     _breakpointId = Int
     _breakWhenChanged = Bool
-    _condition = Str
+    _condition = Unicode
 
     def Add(self):
-        self._process.BindBreakpoint(self)
+        self._process.BindBreakPoint(self)
 
     def Remove(self):
         self._process.RemoveBreakPoint(self)

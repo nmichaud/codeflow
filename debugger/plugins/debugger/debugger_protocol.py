@@ -38,65 +38,232 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         getattr(self, 'receive_%s'%code)(msg[4:])
 
     # Debugger commands to send
-    def send_STPI(self):
-        " Step into"
+    # None of the commands sent to the debugger are length prefixed messages
+    def send_STPI(self, thread_id):
+        """ Step into command
 
-    def send_STPO(self):
-        " Step out"
+        Data format:
+        ------------
+            thread id: long
+        """
+        self.transport.write('stpi')
+        self.transport.write(struct.pack('l', thread_id))
 
-    def send_STPV(self):
-        " Step over"
+    def send_STPO(self, thread_id):
+        """ Step out command
 
-    def send_BRKP(self):
-        " Set breakpoint"
+        Data format:
+        ------------
+            thread id: long
+        """
+        self.transport.write('stpo')
+        self.transport.write(struct.pack('l', thread_id))
 
-    def send_BRKC(self):
-        " Set breakpoint with condition"
+    def send_STPV(self, thread_id):
+        """ Step over command
 
-    def send_BRKR(self):
-        " Remove breakpoint "
+        Data format:
+        ------------
+            thread id: long
+        """
+        self.transport.write('stpv')
+        self.transport.write(struct.pack('l', thread_id))
+
+    def send_BRKP(self, brkpt_id, line_no, filename, condition, break_when_changed):
+        """ Set breakpoint command
+
+        Data format:
+        ------------
+            breakpoint id: int
+            line number: int
+            filename: string
+            condition: string
+            break_when_changed: int
+        """
+        self.transport.write('brkp')
+        self.transport.write(struct.pack('ii', brkpt_id, line_no))
+        self._write_string(filename)
+        self._write_string(condition)
+        self.transport.write(struct.pack('i', 1 if break_when_changed else 0))
+
+    def send_BRKC(self, brkpt_id, condition, break_when_changed):
+        """ Set breakpoint with condition
+
+        Data format:
+            breakpoint id: int
+            condition: string
+            break_when_changed: int
+        ------------
+        """
+        self.transport.write('brkc')
+        self.transport.write(struct.pack('i', brkpt_id))
+        self._write_string(condition)
+        self.transport.write(struct.pack('i', 1 if break_when_changed else 0))
+
+    def send_BRKR(self, brkpt_id, line_no):
+        """ Remove breakpoint command
+
+        Data format:
+        ------------
+            breakpoint id: int
+            line number: int
+        """
+        self.transport.write('brkr')
+        self.transport.write(struct.pack('ii', brkpt_id, line_no))
 
     def send_BRKA(self):
-        " Break all "
+        """ Break all command
+
+        Data format:
+        ------------
+        """
+        self.transport.write('brka')
 
     def send_RESA(self):
-        " Resume all"
+        """ Resume all command
 
-    def send_REST(self):
-        " Resume thread"
+        Data format:
+        ------------
+        """
+        self.transport.write('resa')
 
-    def send_EXEC(self):
-        " Execute code"
+    def send_REST(self, thread_id):
+        """ Resume thread command
 
-    def send_CHLD(self):
-        " Enumerate children"
+        Data format:
+        ------------
+            thread id: long
+        """
+        self.transport.write('rest')
+        self.transport.write(struct.pack('l', thread_id))
 
-    def send_SETL(self):
-        " Set line number"
+    def send_EXEC(self, code, thread_id, frame_id, execution_id):
+        """ Execute code command
+
+        Data format:
+        ------------
+            code: string
+            thread id: long
+            frame id: int
+            execution id: int
+            frame_kind: int  # UNUSED
+        """
+        self.transport.write('exec')
+        self._write_string(code)
+        self.transport.write(struct.pack('liii', thread_id, frame_id, execution_id, 1))
+
+    def send_CHLD(self, code, thread_id, frame_id, execution_id, child_is_enumerate):
+        """ Enumerate children in given frame
+
+        Data format:
+        -----------
+            code: string
+            thread_id: long
+            frame_id: int
+            execution_id: int
+            frame_kind: int # UNUSED
+            child_is_enumerate: int
+        """
+        self.transport.write('chld')
+        self._write_string(code)
+        self.transport.write(struct.pack('liiii', thread_id, frame_id, execution_id, 1, 1 if child_is_enumerate else 0))
+
+    def send_SETL(self, thread_id, frame_id, line_number):
+        """ Set line number command
+
+        Data format:
+        ------------
+            thread id: long
+            frame id: int
+            line number: int
+        """
+        self.transport.write('setl')
+        self.transport.write(struct.pack('lii', thread_id, frame_id, line_number))
 
     def send_DETC(self):
-        " Detach"
+        """  Detach command
 
-    def send_CLST(self):
-        " Clear stepping"
+        Data format:
+        -----------
+        """
+        self.transport.write('detc')
 
-    def send_SEXI(self):
-        " Set exception info"
+    def send_CLST(self, thread_id):
+        """ Clear stepping command
 
-    def send_SEHI(self):
-        " Set exception handler info"
+        Data format:
+        ------------
+            thread id: long
+        """
+        self.transport.write('clst')
+        self.transport.write(struct.pack('l', thread_id))
+
+    def send_SEXI(self, exception_mode, exceptions):
+        """ Set exception info command
+
+        Data format:
+        ------------
+            break_mode: int
+            exception count: int
+            exceptions:
+                mode: int
+                name: string
+        """
+        self.transport.write('sexi')
+        self.transport.write(struct.pack('ii', exception_mode, len(exceptions)))
+        for excp in exceptions:
+            self.transport.write(struct.pack('i', excp.mode))
+            self._write_string(excp.name)
+
+    def send_SEHI(self, statements):
+        """ Set exception handler info command
+
+        Data format:
+        ------------
+            filename: string
+            statement count: int
+            statements:
+                line start: int
+                line end: int
+                text: string
+        """
+        # XXX The statement text format has to be worked out
+        self.transport.write('sehi')
+        self._write_string(filename)
+        self.transport.write(struct.pack('i', len(statements)))
+        for statement in statements:
+            self.transport.write(struct.pack('ii', statement.start, statement.end))
+            self._write_string(statement.text)
 
     def send_BKDR(self):
-        " Remove django breakpoint "
+        """ Remove django breakpoint command
+
+        Unsupported at this time
+        """
 
     def send_BKDA(self):
-        " Add django breakpoint"
+        """ Add django breakpoint command
 
-    def send_CREP(self):
-        " Connect REPL"
+        Unsupported at this time
+        """
+
+    def send_CREP(self, port):
+        """ Connect REPL command
+
+        Data format:
+        ------------
+            port: int
+        """
+        self.transport.write('crep')
+        self.transport.write(struct.pack('i', port))
 
     def send_DREP(self):
-        " Disconnect REPL"
+        """ Disconnect REPL command
+
+        Data format:
+        ------------
+        """
+        self.transport.write('drep')
 
     # Debugger events received
     def receive_CONN(self, bytes):
@@ -357,6 +524,12 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         fname, bytes = self._read_string(bytes)
         assert(len(bytes) == 0)
+
+    def _write_string(self, string):
+        """ Writes a string in the format expected by the debugger
+        """
+        # Use the protocol's sendString
+        self.sendString(string.encode('utf8'))
 
     def _read_string(self, bytes):
         """ Reads a string out of bytes, returning the string

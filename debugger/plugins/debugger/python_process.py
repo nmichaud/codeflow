@@ -16,7 +16,7 @@ class PythonProcess(HasTraits):
     _threads = Dict #(int, PythonThread)
     _breakpoints = Dict #(int, PythonBreakpoint)
 
-    _protocol = Instance(PyToolsProtocol)
+    protocol = Instance(PyToolsProtocol)
 
     #_lineEvent
     #_ids = Instance(IdDispenser)
@@ -68,28 +68,28 @@ class PythonProcess(HasTraits):
 
     # API used by other pieces
     def SendStepInto(self, thread_id):
-        self._protocol.send_STPI(thread_id)
+        self.protocol.send_STPI(thread_id)
 
     def SendStepOver(self, thread_id):
-        self._protocol.send_STPV(thread_id)
+        self.protocol.send_STPV(thread_id)
 
     def SendStepOut(self, thread_id):
-        self._protocol.send_STPO(thread_id)
+        self.protocol.send_STPO(thread_id)
 
     def SendResumeThread(self, thread_id):
-        self._protocol.send_REST(thread_id)
+        self.protocol.send_REST(thread_id)
 
     def SendClearStepping(self, thread_id):
-        self._protocol.send_CLST(thread_id)
+        self.protocol.send_CLST(thread_id)
 
     def Resume(self):
-        self._protocol.send_RESA()
+        self.protocol.send_RESA()
 
     def Break(self):
-        self._protocol.send_BRKA()
+        self.protocol.send_BRKA()
 
     def BindBreakPoint(self, breakpoint):
-        self._protocol.send_BRKP(
+        self.protocol.send_BRKP(
             breakpoint.Id, breakpoint.LineNo, breakpoint.Filename,
             breakpoint.Condition, breakpoint.BreakWhenChanged
             )
@@ -99,25 +99,25 @@ class PythonProcess(HasTraits):
         self.DisableBreakPoint(breakpoint)
 
     def DisableBreakPoint(self, breakpoint):
-        self._protocol.send_BRKR(
+        self.protocol.send_BRKR(
             breakpoint.Id, breakpoint.LineNo
             )
 
     def SetBreakPointCondition(self, breakpoint):
-        self._protocol.send_BRKC(
+        self.protocol.send_BRKC(
             breakpoint.Id, breakpoint.Condition,
             breakpoint.BreakWhenChanged
             )
 
     def SetLineNumber(self, frame, lineNo):
-        self._protocol.send_SETL(
+        self.protocol.send_SETL(
             frame.Thread.Id, frame.FrameId, LineNo
             )
 
     def ExecuteText(self, frame, completion):
         # XXX Create an execution id
         executionId = 0
-        self._protocol.send_EXEC(
+        self.protocol.send_EXEC(
             completion, frame.Thread.Id, frame.FrameId,
             executionId)
 

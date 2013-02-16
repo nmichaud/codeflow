@@ -1,29 +1,35 @@
+import uuid
+
 # Enthought library imports
-from traits.api import HasTraits, Any, Bool, Instance, Enum
+from traits.api import HasTraits, Bool, Instance, Dict
 
 # Local imports
 from python_process import PythonProcess
-from debugger_protocol import DebugFactory
+from debugger_protocol import PyToolsProtocol
+from twisted.internet.protocol import ServerFactory
 
-class DebuggerService(HasTraits):
-
-    reactor = Any()
+class DebuggerService(HasTraits, ServerFactory):
 
     running = Bool(False)
-    process = Instance(PythonProcess)
 
-    server = Instance(DebugFactory, ())
+    processes = Dict(uuid.UUID, PythonProcess)
 
     def stop_service(self):
-        if self.process:
-            self.terminate()
-
-    def listen(self, debug_port):
-        self.reactor.listenTCP(debug_port, self.server)
+        for process in self.processes.values():
+            process.Terminate()
 
     def debug(self, filename):
-        self.process = PythonProcess()
-        self.process.Start(filename)
+        process = PythonProcess()
+        # Add to internal cache before starting
+        self.processes[process.ProcessGuid] = process
+        process.Start(filename)
+        return process
 
-    def terminate(self):
-        self.process.Terminate()
+    def buildProtocol(self, addr):
+        return PyToolsProtocol(self)
+
+    def processConnected(self, guid, protocol):
+        # Lookup the process and set up the protocol
+        process = self.processes.get(uuid.UUID(guid))
+        if process:
+            process.protocol = protocol

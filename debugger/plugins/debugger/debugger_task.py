@@ -147,7 +147,10 @@ class DebuggerTask(Task):
         """ Start debugging the current file
         """
         editor = self.active_editor
-        self.debugger_service.debug(editor.path)
+        process = self.debugger_service.debug(editor.path)
+
+        # Start the process
+        process.Start()
 
     def stop_debugger(self):
         """ Stop the currently running debug instance

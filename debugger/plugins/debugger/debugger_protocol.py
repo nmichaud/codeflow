@@ -1,17 +1,11 @@
 import struct
 
-from twisted.internet.protocol import Factory
 from twisted.internet.interfaces import IProtocol
 from twisted.protocols.basic import IntNStringReceiver
 from zope.interface import implements
 
 # Enthought library imports
 from traits.api import HasTraits, Enum, Event
-
-class DebugFactory(Factory):
-    def buildProtocol(self, addr):
-        return PyToolsProtocol(self)
-
 
 class PyToolsProtocol(HasTraits, IntNStringReceiver):
 
@@ -289,10 +283,11 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             Debug ID: string
             Success flag: int
         """
-        string, bytes = self._read_string(bytes)
+        guid, bytes = self._read_string(bytes)
         flag, = struct.unpack('i', bytes)
 
         self.state = 'debugging'
+        self.factory.processConnected(guid, self)
 
         # Send default exception handling info
         # format: count, (mode, name) - name is something like 'Exception.KeyError'

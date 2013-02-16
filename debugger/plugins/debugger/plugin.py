@@ -4,7 +4,7 @@ import os.path
 # Enthought library imports.
 from envisage.api import Plugin, ServiceOffer
 from envisage.ui.tasks.api import TaskFactory
-from traits.api import Any, List
+from traits.api import Any, List, Int
 
 
 class DebuggerPlugin(Plugin):
@@ -39,6 +39,8 @@ class DebuggerPlugin(Plugin):
     ###########################################################################
     # Protected interface.
     ###########################################################################
+
+    debug_port = Int(8000)
 
     _debugger_service = Any()
 
@@ -76,9 +78,9 @@ class DebuggerPlugin(Plugin):
         from ..twisted.ireactor import IReactorTCP
 
         # Get the twisted reactor from the reactor plugin
-        #reactor = self.application.get_service('plugins.twisted.ireactor.IReactorTCP')
+        self._debugger_service = service = DebuggerService()
+
         reactor = self.application.get_service(IReactorTCP)
-        self._debugger_service = service = DebuggerService(reactor=reactor)
-        service.listen(8000)
+        reactor.listenTCP(self.debug_port, service)
         return service
 

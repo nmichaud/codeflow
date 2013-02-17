@@ -105,7 +105,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
         if column is None:
             column = col0
         line -= 1
-        column -= 1
+        #column -= 1
         block = self.document().findBlockByLineNumber(line)
         line_start = block.position()
         position = line_start + column

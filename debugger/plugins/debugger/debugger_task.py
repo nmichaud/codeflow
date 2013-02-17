@@ -10,6 +10,7 @@ from traits.api import on_trait_change, Property, Instance, Bool
 
 # Local imports.
 from file_panes import PythonScriptBrowserPane
+from stack_pane import StackPane
 from python_editor import PythonEditor
 
 class DebuggerTask(Task):
@@ -25,6 +26,8 @@ class DebuggerTask(Task):
                              depends_on='editor_area.active_editor')
 
     editor_area = Instance(IEditorAreaPane)
+
+    stack_pane = Instance(StackPane)
 
     menu_bar = SMenuBar(SMenu(TaskAction(name='New', method='new',
                                          accelerator='Ctrl+N'),
@@ -75,7 +78,8 @@ class DebuggerTask(Task):
 
     def _default_layout_default(self):
         return TaskLayout(
-            left=PaneItem('debugger.python_script_browser_pane'))
+            left=PaneItem('debugger.python_script_browser_pane'),
+            right=PaneItem('debugger.stack_pane'))
 
     def activated(self):
         """ Overriden to set the window's title.
@@ -96,7 +100,8 @@ class DebuggerTask(Task):
         browser = PythonScriptBrowserPane()
         handler = lambda: self._open_file(browser.selected_file)
         browser.on_trait_change(handler, 'activated')
-        return [ browser ]
+        self.stack_pane = StackPane()
+        return [ browser, self.stack_pane ]
 
     ###########################################################################
     # 'DebuggerTask' interface.
@@ -109,6 +114,23 @@ class DebuggerTask(Task):
 
     def _get_ready_to_debug(self):
         return self.active_editor != None
+
+    @on_trait_change('debug_process:_threads_items')
+    def threads_changed(self, name, event):
+        for k, thread in event.added.items():
+            thread.on_trait_change(self.update_stack, '_frames')
+        for k, thread in event.removed.items():
+            thread.on_trait_change(self.update_stack, '_frames', remove=True)
+
+    def update_stack(self, name, new):
+        self.stack_pane.stack_frames = new
+
+    @on_trait_change('stack_pane:selected')
+    def show_frame(self, selected):
+        editor = self.active_editor
+        if selected._filename != editor.path:
+            editor.path = selected._filename
+        editor.select_line(selected._lineNo)
 
     def new(self):
         """ Opens a new empty window

@@ -428,7 +428,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         thread_id, = struct.unpack('l', bytes)
-        self.stepComplete = True
+        self.stepComplete = thread_id
 
     def receive_BRKS(self, bytes):
         """ Breakpoint set message

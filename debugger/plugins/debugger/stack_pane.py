@@ -47,8 +47,12 @@ class StackPane(TraitsDockPane):
                                           adapter_name='frame_adapter',
                                           ),
                      style='custom',
+                     enabled_when='len(controller.stack_frames) > 0',
                      show_label=False),
                 resizable=True)
 
     def _stack_frames_changed(self, frames):
-        self.selected = frames[0]
+        if frames:
+            self.selected = frames[0]
+        else:
+            self.selected = None

@@ -53,6 +53,10 @@ class DebuggerTask(Task):
                                       tooltip='Start debugger',
                                       enabled_name = 'ready_to_debug',
                                       image=ImageResource('debugger_start')),
+                           TaskAction(method='continue_debugger',
+                                      tooltip='Continue debugger',
+                                      enabled_name = 'debug_process.readyToDebug',
+                                      image=ImageResource('debugger_continue')),
                            TaskAction(method='stop_debugger',
                                       tooltip='Stop debugger',
                                       enabled_name = 'debug_process.readyToDebug',
@@ -110,10 +114,10 @@ class DebuggerTask(Task):
     debugger_service = Instance('plugins.debugger.debugger_service.DebuggerService')
     debug_process = Instance('plugins.debugger.python_process.PythonProcess')
 
-    ready_to_debug = Property(Bool, depends_on='active_editor')
+    ready_to_debug = Property(Bool, depends_on='active_editor, debug_process')
 
     def _get_ready_to_debug(self):
-        return self.active_editor != None
+        return self.active_editor != None and not self.debug_process
 
     @on_trait_change('debug_process:_threads_items')
     def threads_changed(self, name, event):
@@ -121,16 +125,18 @@ class DebuggerTask(Task):
             thread.on_trait_change(self.update_stack, '_frames')
         for k, thread in event.removed.items():
             thread.on_trait_change(self.update_stack, '_frames', remove=True)
+            self.update_stack('', [])
 
     def update_stack(self, name, new):
         self.stack_pane.stack_frames = new
 
     @on_trait_change('stack_pane:selected')
     def show_frame(self, selected):
-        editor = self.active_editor
-        if selected._filename != editor.path:
-            editor.path = selected._filename
-        editor.select_line(selected._lineNo)
+        if selected:
+            editor = self.active_editor
+            if selected._filename != editor.path:
+                editor.path = selected._filename
+            editor.select_line(selected._lineNo)
 
     def new(self):
         """ Opens a new empty window
@@ -175,6 +181,12 @@ class DebuggerTask(Task):
         """ Stop the currently running debug instance
         """
         self.debugger_service.stop()
+
+    def continue_debugger(self):
+        """ Continue the currently running debug instance
+        """
+        thread = self.debug_process._threads.values()[0]
+        thread.Resume()
 
     def step_into_line(self):
         """ Step into the next line

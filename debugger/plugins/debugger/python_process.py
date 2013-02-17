@@ -31,6 +31,16 @@ class PythonProcess(HasStrictTraits):
         thread = PythonThread(_identity=thread_id, _process=self, _isWorkerThread=isWorker)
         self._threads[thread_id] = thread
 
+    @on_trait_change('protocol:threadExited')
+    def thread_exit(self, thread_id):
+        # Remove thread
+        thread = self._threads.pop(thread_id)
+        if not thread.IsWorkerThread:
+            # The main thread is exiting
+            self.readyToDebug = False
+            self.WaitForExit()
+            self._process = None
+
     @on_trait_change('protocol:threadFrameList')
     def new_frame_list(self, (thread_id, thread_name, frames)):
         thread = self._threads[thread_id]
@@ -88,8 +98,8 @@ class PythonProcess(HasStrictTraits):
                 os.getcwd(),
                 '8000',
                 str(self._processGuid),
-                '--wait-on-exception',
-                '--wait-on-exit',
+                #'--wait-on-exception',
+                #'--wait-on-exit',
                 '--redirect-output',
                 filename,
                 ]
@@ -100,7 +110,9 @@ class PythonProcess(HasStrictTraits):
         return self._process.wait()
 
     def Terminate(self):
-        self._process.terminate()
+        # If there are any threads still running
+        if len(self._threads) > 0:
+            self._process.terminate()
 
     # API used by other pieces
     def SendStepInto(self, thread_id):

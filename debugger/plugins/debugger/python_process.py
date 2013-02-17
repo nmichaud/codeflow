@@ -88,10 +88,10 @@ class PythonProcess(HasStrictTraits):
                 os.getcwd(),
                 '8000',
                 str(self._processGuid),
-                filename,
                 '--wait-on-exception',
                 '--wait-on-exit',
                 '--redirect-output',
+                filename,
                 ]
 
         self._process = subprocess.Popen(args)

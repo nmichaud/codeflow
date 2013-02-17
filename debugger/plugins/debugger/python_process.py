@@ -19,6 +19,12 @@ class PythonProcess(HasStrictTraits):
 
     protocol = Instance(PyToolsProtocol)
 
+    readyToDebug = Bool(False)
+
+    @on_trait_change('protocol:processLoaded')
+    def process_loaded(self, thread_id):
+        self.readyToDebug = True
+
     @on_trait_change('protocol:threadCreated')
     def new_thread(self, thread_id):
         isWorker = len(self._threads) != 0

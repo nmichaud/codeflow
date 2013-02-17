@@ -52,19 +52,19 @@ class DebuggerTask(Task):
                                       image=ImageResource('debugger_start')),
                            TaskAction(method='stop_debugger',
                                       tooltip='Stop debugger',
-                                      enabled_name = 'debugger_service.running',
+                                      enabled_name = 'debug_process.readyToDebug',
                                       image=ImageResource('debugger_stop')),
                            TaskAction(method='step_over_line',
                                       tooltip='Step over next line',
-                                      enabled_name = 'debugger_running',
+                                      enabled_name = 'debug_process.readyToDebug',
                                       image=ImageResource('debugger_step_over')),
                            TaskAction(method='step_into_line',
                                       tooltip='Step into next line',
-                                      enabled_name = 'debugger_running',
+                                      enabled_name = 'debug_process.readyToDebug',
                                       image=ImageResource('debugger_step_into')),
                            TaskAction(method='step_out',
                                       tooltip='Step out of the current function',
-                                      enabled_name = 'debugger_running',
+                                      enabled_name = 'debug_process.readyToDebug',
                                       image=ImageResource('debugger_step_out')),
                            image_size = (24, 24)),
                 ]
@@ -103,8 +103,8 @@ class DebuggerTask(Task):
     ###########################################################################
 
     debugger_service = Instance('plugins.debugger.debugger_service.DebuggerService')
+    debug_process = Instance('plugins.debugger.python_process.PythonProcess')
 
-    debugger_running = Bool(False)
     ready_to_debug = Property(Bool, depends_on='active_editor')
 
     def _get_ready_to_debug(self):
@@ -147,10 +147,7 @@ class DebuggerTask(Task):
         """ Start debugging the current file
         """
         editor = self.active_editor
-        process = self.debugger_service.debug(editor.path)
-
-        # Start the process
-        #process.Start()
+        self.debug_process = self.debugger_service.debug(editor.path)
 
     def stop_debugger(self):
         """ Stop the currently running debug instance
@@ -160,17 +157,20 @@ class DebuggerTask(Task):
     def step_into_line(self):
         """ Step into the next line
         """
-        pass
+        thread = self.debug_process._threads.values()[0]
+        thread.StepInto()
 
     def step_over_line(self):
         """ Step over the next line
         """
-        pass
+        thread = self.debug_process._threads.values()[0]
+        thread.StepOver()
 
     def step_out(self):
         """ Step out of the current line
         """
-        pass
+        thread = self.debug_process._threads.values()[0]
+        thread.StepOut()
 
     ###########################################################################
     # Protected interface.

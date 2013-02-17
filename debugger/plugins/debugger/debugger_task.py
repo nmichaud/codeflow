@@ -150,7 +150,7 @@ class DebuggerTask(Task):
         process = self.debugger_service.debug(editor.path)
 
         # Start the process
-        process.Start()
+        #process.Start()
 
     def stop_debugger(self):
         """ Stop the currently running debug instance

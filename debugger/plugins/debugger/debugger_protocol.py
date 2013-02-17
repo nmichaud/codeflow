@@ -27,6 +27,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
     breakpointBindFailed = Event()
     setLineNoComplete = Event()
     debuggerOutput = Event()
+    threadFrameList = Event()
 
     structFormat = "I"
     prefixLength = struct.calcsize(structFormat)
@@ -343,21 +344,22 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         thread_id, = struct.unpack('l', bytes[:8])
         tname, bytes = self._read_string(bytes[8:])
         fcount, = struct.unpack('i', bytes[:4])
-        print 'Thread:',thread_id, tname
         bytes = bytes[4:]
+        frames = []
         for f_i in range(fcount):
             flineno,lineno,curlineno = struct.unpack('iii', bytes[:12])
             framename, bytes = self._read_string(bytes[12:])
             filename, bytes = self._read_string(bytes)
             argcount, vcount = struct.unpack('ii', bytes[:8])
-            print '\tFrame', flineno, lineno, curlineno, framename, filename, argcount, vcount
             bytes = bytes[8:]
+            vars = []
             for v_i in range(vcount):
                 varname, bytes = self._read_string(bytes)
                 obj, bytes = self._read_object(bytes)
-                print '\t\tVar:', obj
-
+                vars.append((varname, obj))
+            frames.append((flineno,lineno,curlineno,framename,filename,argcount,vars))
         assert(len(bytes) == 0)
+        self.threadFrameList = (thread_id, tname, frames)
 
     def receive_DETC(self, bytes):
         """ Detach message (process exited)

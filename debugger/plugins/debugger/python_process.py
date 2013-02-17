@@ -3,20 +3,51 @@ import os, sys, subprocess, uuid
 
 # Enthought library imports
 from traits.api import (
-    HasTraits, Any, Event, Instance, Dict, List, Unicode, Bool, Int
+    HasStrictTraits, Any, Event, Instance, Dict, List, Unicode, Bool, Int,
+    Property, WeakRef, on_trait_change,
     )
 
 # Local imports
 from debugger_protocol import PyToolsProtocol
 
 
-class PythonProcess(HasTraits):
+class PythonProcess(HasStrictTraits):
 
     _process = Instance(subprocess.Popen)
-    _threads = Dict #(int, PythonThread)
-    _breakpoints = Dict #(int, PythonBreakpoint)
+    _threads = Dict() #(int, PythonThread)
+    _breakpoints = Dict() #(int, PythonBreakpoint)
 
     protocol = Instance(PyToolsProtocol)
+
+    @on_trait_change('protocol:threadCreated')
+    def new_thread(self, thread_id):
+        isWorker = len(self._threads) != 0
+        thread = PythonThread(_identity=thread_id, _process=self, _isWorkerThread=isWorker)
+        self._threads[thread_id] = thread
+
+    @on_trait_change('protocol:threadFrameList')
+    def new_frame_list(self, (thread_id, thread_name, frames)):
+        thread = self._threads[thread_id]
+        thread.Name = thread_name
+        _frames = []
+        for startline,endline,lineno,framename,filename,argcount,vars in frames:
+            frame = PythonStackFrame(
+                _startLine=startline, _endLine=endline, _lineNo=lineno,
+                _frameName=framename, _filename=filename,_argCount=argcount,
+                _thread=self
+                    )
+            _vars = []
+            for varname, (varrepr,varhex,vartype,varexp)  in vars:
+                var = PythonEvaluationResult(
+                    _objRepr=varrepr, _typeName=vartype, _hexRepr=varhex,
+                    _isExpandable=(varexp == 1), _childText='', _childIsIndex=False,
+                    _childIsEnumerate=False, _frame=frame, _process=self,
+                    )
+                _vars.append(var)
+            frame._variables = _vars
+
+            _frames.append(frame)
+        thread._frames = _frames
 
     #_lineEvent
     #_ids = Instance(IdDispenser)
@@ -30,11 +61,11 @@ class PythonProcess(HasTraits):
 
     _dirMapping = List(Unicode)
 
-    _sentExited = Bool
-    _breakpointCounter = Int
-    _setLineResult = Bool
-    _createdFirstThread = Bool
-    _stoppedForException = Bool
+    _sentExited = Bool()
+    _breakpointCounter = Int()
+    _setLineResult = Bool()
+    _createdFirstThread = Bool()
+    _stoppedForException = Bool()
 
     #_defaultBreakMode
     #_breakOn
@@ -58,7 +89,6 @@ class PythonProcess(HasTraits):
                 ]
 
         self._process = subprocess.Popen(args)
-        # Wait for process to connect
 
     def WaitForExit(self):
         return self._process.wait()
@@ -122,22 +152,49 @@ class PythonProcess(HasTraits):
             executionId)
 
 
-class PythonEvaluationResult(HasTraits):
-    pass
+class PythonEvaluationResult(HasStrictTraits):
+    _expression = Unicode()
+    _objRepr = Unicode()
+    _typeName = Unicode()
+    _exceptionText = Unicode()
+    _childText = Unicode()
+    _hexRepr = Unicode()
+
+    _isExpandable = Bool()
+    _childIsIndex = Bool()
+    _childIsEnumerate = Bool()
+
+    _frame = WeakRef()
+    _process = WeakRef()
+
+    def GetChildren(self):
+        self._process.EnumChildren(self.Expression, self._frame, self._childIsEnumerate)
+
+    Expression = Property(Unicode, depends_on='_childText, _expression')
+    def _get_Expression(self):
+        if self._childText:
+            if self._childIsIndex:
+                return self._expression + self._childText
+            else:
+                return self._expression + '.' + self._childText
+        else:
+            return self._expression
+
+    ChildText = property(fget=lambda self: self._childText)
 
 
-class PythonStackFrame(HasTraits):
-    _lineNo = Int
-    _frameName = Unicode
-    _filename = Unicode
-    _argCount = Int
-    _frameId = Int
-    _startLine = Int
-    _endLine = Int
+class PythonStackFrame(HasStrictTraits):
+    _lineNo = Int()
+    _frameName = Unicode()
+    _filename = Unicode()
+    _argCount = Int()
+    _frameId = Int()
+    _startLine = Int()
+    _endLine = Int()
 
     _variables = List(Instance(PythonEvaluationResult))
 
-    #_thread = Instance(PythonThread)
+    _thread = WeakRef() # PythonThread
 
     StartLine = property(lambda self: self._startLine)
     EndLine = property(lambda self: self._endLine)
@@ -164,11 +221,11 @@ class PythonStackFrame(HasTraits):
         return self._thread.Process.SetLineNumber(self, lineNo)
 
 
-class PythonThread(HasTraits):
-    _identity = Int
-    _process = Instance(PythonProcess)
-    _isWorkerThread = Bool
-    _name = Unicode
+class PythonThread(HasStrictTraits):
+    _identity = Int()
+    _process = WeakRef() # PythonProcess
+    _isWorkerThread = Bool()
+    _name = Unicode()
     _frames = List(Instance(PythonStackFrame))
 
     Process = property(lambda self: self._process)
@@ -189,16 +246,13 @@ class PythonThread(HasTraits):
         self._process.SendClearStepping(self._identity)
 
 
-PythonStackFrame.add_class_trait('_thread', Instance(PythonThread))
-
-
-class PythonBreakpoint(HasTraits):
-    _process = Instance(PythonProcess)
-    _filename = Unicode
-    _lineNo = Int
-    _breakpointId = Int
-    _breakWhenChanged = Bool
-    _condition = Unicode
+class PythonBreakpoint(HasStrictTraits):
+    _process = WeakRef() # PythonProcess
+    _filename = Unicode()
+    _lineNo = Int()
+    _breakpointId = Int()
+    _breakWhenChanged = Bool()
+    _condition = Unicode()
 
     def Add(self):
         self._process.BindBreakPoint(self)

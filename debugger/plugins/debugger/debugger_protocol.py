@@ -225,7 +225,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             self.transport.write(struct.pack('i', excp.mode))
             self._write_string(excp.name)
 
-    def send_SEHI(self, statements):
+    def send_SEHI(self, filename, statements):
         """ Set exception handler info command
 
         Data format:
@@ -544,6 +544,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             code_filename: string
         """
         fname, bytes = self._read_string(bytes)
+        # XXX for now, send back and empty list of handled exceptions
+        self.send_SEHI(fname, [])
+        print 'Requested handlers for ', fname
         assert(len(bytes) == 0)
 
     def _write_string(self, string):

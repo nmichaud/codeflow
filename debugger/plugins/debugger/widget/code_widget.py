@@ -31,8 +31,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
     # CodeWidget interface
     ###########################################################################
 
-    def __init__(self, parent, should_highlight_current_line=True, font=None,
-                 lexer=None):
+    def __init__(self, parent, font=None, lexer=None):
         super(CodeWidget, self).__init__(parent)
 
         self.highlighter = PygmentsHighlighter(self.document(), lexer)
@@ -54,9 +53,6 @@ class CodeWidget(QtGui.QPlainTextEdit):
             font.setStyleHint(QtGui.QFont.TypeWriter)
         self.set_font(font)
 
-        # Whether we should highlight the current line or not.
-        self.should_highlight_current_line = should_highlight_current_line
-
         # What that highlight color should be.
         self.line_highlight_color = QtGui.QColor(QtCore.Qt.yellow).lighter(160)
 
@@ -74,10 +70,8 @@ class CodeWidget(QtGui.QPlainTextEdit):
         # Set up gutter widget and current line highlighting
         self.blockCountChanged.connect(self.update_line_number_width)
         self.updateRequest.connect(self.update_line_numbers)
-        self.cursorPositionChanged.connect(self.highlight_current_line)
 
         self.update_line_number_width()
-        self.highlight_current_line()
 
         # Don't wrap text
         self.setLineWrapMode(QtGui.QPlainTextEdit.NoWrap)
@@ -142,7 +136,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
         """
         left = 0
         if not self.line_number_widget.isHidden():
-            left = self.line_number_widget.digits_width()
+            left = self.line_number_widget.gutter_width()
         self.setViewportMargins(left, 0, 0, 0)
 
     def update_line_numbers(self, rect, dy):
@@ -166,18 +160,6 @@ class CodeWidget(QtGui.QPlainTextEdit):
     def set_error_lines(self, error_lines):
         self.status_widget.error_lines = error_lines
         self.status_widget.update()
-
-    def highlight_current_line(self):
-        """ Highlight the line with the cursor.
-        """
-        if self.should_highlight_current_line:
-            selection = QtGui.QTextEdit.ExtraSelection()
-            selection.format.setBackground(self.line_highlight_color)
-            selection.format.setProperty(
-                QtGui.QTextFormat.FullWidthSelection, True)
-            selection.cursor = self.textCursor()
-            selection.cursor.clearSelection()
-            self.setExtraSelections([selection])
 
     def autoindent_newline(self):
         tab = '\t'
@@ -415,7 +397,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
         QtGui.QPlainTextEdit.resizeEvent(self, event)
         contents = self.contentsRect()
         self.line_number_widget.setGeometry(QtCore.QRect(contents.left(),
-            contents.top(), self.line_number_widget.digits_width(),
+            contents.top(), self.line_number_widget.gutter_width(),
             contents.height()))
 
         # use the viewport width to determine the right edge. This allows for
@@ -437,6 +419,10 @@ class CodeWidget(QtGui.QPlainTextEdit):
         width += style.pixelMetric(QtGui.QStyle.PM_ScrollBarExtent, opt, self)
         height = font_metrics.height() * 40
         return QtCore.QSize(width, height)
+
+    def setTextCursor(self, cursor):
+        cursor.setVisualNavigation(True)
+        super(CodeWidget, self).setTextCursor(cursor)
 
     ###########################################################################
     # Private methods

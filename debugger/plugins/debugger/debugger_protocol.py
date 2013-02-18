@@ -1,4 +1,5 @@
 import struct
+import collections
 
 from twisted.internet.interfaces import IProtocol
 from twisted.protocols.basic import IntNStringReceiver
@@ -546,8 +547,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         fname, bytes = self._read_string(bytes)
         # XXX for now, send back and empty list of handled exceptions
-        self.send_SEHI(fname, [])
-        print 'Requested handlers for ', fname
+        statement = collections.namedtuple('statement', 'start, end, text')
+        self.send_SEHI(fname, [statement(-1, 0, '-')])
         assert(len(bytes) == 0)
 
     def _write_string(self, string):

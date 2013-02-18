@@ -1347,6 +1347,9 @@ class DebuggerLoop(object):
             for _ in xrange(statement_count):
                 line_start, line_end = read_int(self.conn), read_int(self.conn)
 
+                if line_start == -1:
+                    line_start = None
+
                 expressions = set()
                 text = read_string(self.conn).strip()
                 while text != '-':

@@ -16,7 +16,7 @@ class StackAdapter(ListStrAdapter):
     def _get_text(self):
         f = self.item
         filename = os.path.basename(f._filename)
-        line = ''
+        line = ''.join(['  %s: %s\n'%(v.Expression, v._objRepr) for v in f.Locals if v._typeName != u'module'])
         return ('%s, Line %d, in %s(%d-%d)\n%s'
                  %(filename, f._lineNo, f._frameName, f._startLine, f._endLine, line))
 

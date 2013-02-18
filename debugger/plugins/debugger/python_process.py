@@ -60,7 +60,7 @@ class PythonProcess(HasStrictTraits):
             _vars = []
             for varname, (varrepr,varhex,vartype,varexp)  in vars:
                 var = PythonEvaluationResult(
-                    _objRepr=varrepr, _typeName=vartype, _hexRepr=varhex,
+                    _expression=varname, _objRepr=varrepr, _typeName=vartype, _hexRepr=varhex,
                     _isExpandable=(varexp == 1), _childText='', _childIsIndex=False,
                     _childIsEnumerate=False, _frame=frame, _process=self,
                     )
@@ -241,12 +241,13 @@ class PythonStackFrame(HasStrictTraits):
     FunctionName = property(lambda self: self._frameName)
     FileName = property(lambda self: self._thread.Process.MapFile(self._filename, toDebuggee=False))
     FrameId = property(lambda self: self._frameId)
+
     def SetVariables(self, variables):
         self._variables = variables
 
     @property
     def Locals(self):
-        return self._variables[self._argcount:]
+        return self._variables[self._argCount:]
 
     @property
     def Parameters(self):

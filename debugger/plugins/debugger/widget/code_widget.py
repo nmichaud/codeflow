@@ -18,7 +18,7 @@ from pyface.qt import QtCore, QtGui
 
 # Local imports
 from find_widget import FindWidget
-from gutters import LineNumberWidget, StatusGutterWidget
+from gutters import LineNumberWidget, StatusGutterWidget, BreakpointsWidget
 from replace_widget import ReplaceWidget
 from pygments_highlighter import PygmentsHighlighter
 
@@ -26,6 +26,8 @@ from pygments_highlighter import PygmentsHighlighter
 class CodeWidget(QtGui.QPlainTextEdit):
     """ A widget for viewing and editing code.
     """
+
+    breakpointClicked = QtCore.Signal(int)
 
     ###########################################################################
     # CodeWidget interface
@@ -36,6 +38,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
 
         self.highlighter = PygmentsHighlighter(self.document(), lexer)
         self.line_number_widget = LineNumberWidget(self)
+        self.breakpoints_widget = BreakpointsWidget(self)
         self.status_widget = StatusGutterWidget(self)
 
         if font is None:
@@ -70,6 +73,9 @@ class CodeWidget(QtGui.QPlainTextEdit):
         # Set up gutter widget and current line highlighting
         self.blockCountChanged.connect(self.update_line_number_width)
         self.updateRequest.connect(self.update_line_numbers)
+
+        # Set up breakpoint signals
+        self.breakpoints_widget.gutterClicked.connect(self.breakpointClicked)
 
         self.update_line_number_width()
 
@@ -135,8 +141,10 @@ class CodeWidget(QtGui.QPlainTextEdit):
         """ Update the width of the line number widget.
         """
         left = 0
+        if not self.breakpoints_widget.isHidden():
+            left += self.breakpoints_widget.gutter_width()
         if not self.line_number_widget.isHidden():
-            left = self.line_number_widget.gutter_width()
+            left += self.line_number_widget.gutter_width()
         self.setViewportMargins(left, 0, 0, 0)
 
     def update_line_numbers(self, rect, dy):
@@ -144,8 +152,11 @@ class CodeWidget(QtGui.QPlainTextEdit):
         """
         if dy:
             self.line_number_widget.scroll(0, dy)
+            self.breakpoints_widget.scroll(0, dy)
         self.line_number_widget.update(
             0, rect.y(), self.line_number_widget.width(), rect.height())
+        self.breakpoints_widget.update(
+            0, rect.y(), self.breakpoints_widget.width(), rect.height())
         if rect.contains(self.viewport().rect()):
             self.update_line_number_width()
 
@@ -396,13 +407,19 @@ class CodeWidget(QtGui.QPlainTextEdit):
     def resizeEvent(self, event):
         QtGui.QPlainTextEdit.resizeEvent(self, event)
         contents = self.contentsRect()
-        self.line_number_widget.setGeometry(QtCore.QRect(contents.left(),
+        left = contents.left()
+        self.breakpoints_widget.setGeometry(QtCore.QRect(left,
+            contents.top(), self.breakpoints_widget.gutter_width(),
+            contents.height()))
+        left += self.breakpoints_widget.gutter_width()
+        self.line_number_widget.setGeometry(QtCore.QRect(left,
             contents.top(), self.line_number_widget.gutter_width(),
             contents.height()))
 
         # use the viewport width to determine the right edge. This allows for
         # the propper placement w/ and w/o the scrollbar
-        right_pos = self.viewport().width() + self.line_number_widget.width() + 1\
+        right_pos = self.viewport().width() + self.line_number_widget.width() + \
+                    self.breakpoints_widget.width() + 1\
                     - self.status_widget.sizeHint().width()
         self.status_widget.setGeometry(QtCore.QRect(right_pos,
             contents.top(), self.status_widget.sizeHint().width(),
@@ -414,6 +431,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
         opt = QtGui.QStyleOptionHeader()
         font_metrics = QtGui.QFontMetrics(self.document().defaultFont())
         width = font_metrics.width(' ') * 80
+        width += self.breakpoints_widget.sizeHint().width()
         width += self.line_number_widget.sizeHint().width()
         width += self.status_widget.sizeHint().width()
         width += style.pixelMetric(QtGui.QStyle.PM_ScrollBarExtent, opt, self)

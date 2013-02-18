@@ -11,6 +11,7 @@
 
 import math, re
 
+from os.path import join, dirname
 from pyface.qt import QtCore, QtGui
 
 
@@ -20,8 +21,25 @@ class GutterWidget(QtGui.QWidget):
     background_color = QtGui.QColor("#EFEFEF")
     foreground_color = QtGui.QColor("#666666")
 
+    gutterClicked = QtCore.Signal(int)
+
+    def gutter_width(self):
+        return self.min_width
+
     def sizeHint(self):
-        return QtCore.QSize(self.min_width, 0)
+        return QtCore.QSize(self.gutter_width(), 0)
+
+    def mousePressEvent(self, event):
+        cw = self.parent()
+        block = cw.firstVisibleBlock()
+        cw_offset = cw.contentOffset()
+        click_pos = QtCore.QPointF(event.pos())
+
+        while (block.isValid() and not
+            cw.blockBoundingGeometry(block).translated(cw_offset).contains(click_pos)):
+            block = block.next()
+
+        self.gutterClicked.emit(block.blockNumber()+1)
 
     def paintEvent(self, event):
         """ Paint the line numbers.
@@ -45,8 +63,8 @@ class StatusGutterWidget(GutterWidget):
         self.warn_lines = []
         self.info_lines = []
 
-    def sizeHint(self):
-        return QtCore.QSize(10, 0)
+    def gutter_width(self):
+        return 10
 
     def paintEvent(self, event):
         """ Paint the line numbers.
@@ -72,11 +90,76 @@ class StatusGutterWidget(GutterWidget):
                 QtCore.QRect(0, line*pixels_per_block, self.width(), 3),
                 QtCore.Qt.red)
 
+class BreakpointsWidget(GutterWidget):
+    """ Draw breakpoints
+    """
+
+    margin = 2
+
+    _breakpoints = set()
+
+    def __init__(self, *args, **kw):
+        super(BreakpointsWidget, self).__init__(*args, **kw)
+
+        self._bp_pixmap = QtGui.QPixmap(join(dirname(__file__),'images','bp.png'))
+
+    def setBreakpoints(self, breakpoints):
+        """ Set the list of breakpoints
+        """
+        self._breakpoints = set(breakpoints)
+        self.update()
+
+    def gutter_width(self):
+        return self._bp_pixmap.width() + self.margin
+
+    def paintEvent(self, event):
+        """ Paint the breakpoints
+        """
+        painter = QtGui.QPainter(self)
+        painter.fillRect(event.rect(), self.background_color)
+
+        cw = self.parent()
+        curr_block = cw.textCursor().block()
+        curr_block_color = cw.line_highlight_color
+
+        cw_offset = cw.contentOffset()
+
+        block = cw.firstVisibleBlock()
+        geometry = cw.blockBoundingGeometry(block).translated(cw_offset)
+        top = geometry.top()
+        bottom = geometry.bottom()
+        height = geometry.height()
+
+        wrect = self._bp_pixmap.rect()
+        width = self.width()
+
+        symbol_opacity = 0.75
+
+        painter.setOpacity(symbol_opacity)
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                if block == curr_block:
+                    painter.setOpacity(1.0)
+                    painter.fillRect(QtCore.QRect(0, top, width, height),
+                                     curr_block_color)
+                    painter.setOpacity(symbol_opacity)
+
+                if (block.blockNumber()+1) in self._breakpoints:
+                    # Draw breakpoint
+                    painter.drawPixmap(self.margin, top+(height-wrect.height())/2, self._bp_pixmap)
+
+            block = block.next()
+            geometry = cw.blockBoundingGeometry(block).translated(cw_offset)
+            top = geometry.top()
+            bottom = geometry.bottom()
+            height = geometry.height()
+
 class LineNumberWidget(GutterWidget):
     """ Draw line numbers.
     """
 
-    min_char_width = 4
+    min_char_width = 3
 
     def __init__(self, *args, **kw):
         super(LineNumberWidget, self).__init__(*args, **kw)

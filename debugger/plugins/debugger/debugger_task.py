@@ -6,12 +6,37 @@ from pyface.tasks.action.api import DockPaneToggleGroup, SMenuBar, \
 from pyface.api import ConfirmationDialog, FileDialog, \
     ImageResource, YES, OK, CANCEL
 
-from traits.api import on_trait_change, Property, Instance, Bool
+from traits.api import on_trait_change, Property, Instance, Bool, Str
 
 # Local imports.
 from file_panes import PythonScriptBrowserPane
 from stack_pane import StackPane
 from python_editor import PythonEditor
+
+
+class StartContinueTaskAction(TaskAction):
+
+    tooltip = Property(Str, depends_on='task.debug_process')
+
+    method = Property(Str, depends_on='task.active_editor, task.debug_process')
+
+    enabled_name = 'ready_to_debug'
+
+    def _get_tooltip(self):
+        task = self.task
+        if task and task.debug_process and task.debug_process.readyToDebug:
+            return 'Continue debugger'
+        else:
+            return 'Start debugger'
+
+    def _get_method(self):
+        task = self.task
+        if task:
+            if task.active_editor != None and not task.debug_process:
+                return 'start_debugger'
+            elif task.debug_process.readyToDebug:
+                return 'continue_debugger'
+
 
 class DebuggerTask(Task):
     """ A simple task for editing Python code.
@@ -49,14 +74,8 @@ class DebuggerTask(Task):
                                       tooltip='Save the current file',
                                       image=ImageResource('document_save')),
                            image_size = (24, 24)),
-                  SToolBar(TaskAction(method='start_debugger',
-                                      tooltip='Start debugger',
-                                      enabled_name = 'ready_to_debug',
+                  SToolBar(StartContinueTaskAction(
                                       image=ImageResource('debugger_start')),
-                           TaskAction(method='continue_debugger',
-                                      tooltip='Continue debugger',
-                                      enabled_name = 'debug_process.readyToDebug',
-                                      image=ImageResource('debugger_continue')),
                            TaskAction(method='stop_debugger',
                                       tooltip='Stop debugger',
                                       enabled_name = 'debug_process.readyToDebug',
@@ -114,10 +133,10 @@ class DebuggerTask(Task):
     debugger_service = Instance('plugins.debugger.debugger_service.DebuggerService')
     debug_process = Instance('plugins.debugger.python_process.PythonProcess')
 
-    ready_to_debug = Property(Bool, depends_on='active_editor, debug_process')
+    ready_to_debug = Property(Bool, depends_on='active_editor')
 
     def _get_ready_to_debug(self):
-        return self.active_editor != None and not self.debug_process
+        return self.active_editor != None
 
     @on_trait_change('debug_process:_threads_items')
     def threads_changed(self, name, event):
@@ -283,3 +302,4 @@ class DebuggerTask(Task):
         if self.editor_area is not None:
             return self.editor_area.active_editor
         return None
+

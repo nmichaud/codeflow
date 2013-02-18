@@ -23,6 +23,7 @@ class PythonProcess(HasStrictTraits):
     readyToDebug = Bool(False)
 
     moduleLoaded = Event()
+    completedDebugging = Event()
 
     @on_trait_change('protocol:processLoaded')
     def process_loaded(self, thread_id):
@@ -40,9 +41,10 @@ class PythonProcess(HasStrictTraits):
         thread = self._threads.pop(thread_id)
         if not thread.IsWorkerThread:
             # The main thread is exiting
-            self.readyToDebug = False
             self.WaitForExit()
             self._process = None
+            self.readyToDebug = False
+            self.completedDebugging = True
 
     @on_trait_change('protocol:threadFrameList')
     def new_frame_list(self, (thread_id, thread_name, frames)):

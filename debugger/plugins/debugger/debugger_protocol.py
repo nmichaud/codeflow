@@ -16,7 +16,6 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
 
     # Protocol events
     processLoaded = Event()
-    processExited = Event()
     threadCreated = Event()
     threadExited = Event()
     stepComplete = Event()
@@ -370,7 +369,6 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             None
         """
         assert(len(bytes) == 0)
-        self.processExited = True
 
     def receive_NEWT(self, bytes):
         """ New thread created

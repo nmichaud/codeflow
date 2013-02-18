@@ -18,11 +18,10 @@ class DebuggerService(HasTraits, ServerFactory):
         for process in self.processes.values():
             process.Terminate()
 
-    def debug(self, filename):
+    def debug(self):
         process = PythonProcess()
         # Add to internal cache before starting
         self.processes[process.ProcessGuid] = process
-        process.Start(filename)
         return process
 
     def buildProtocol(self, addr):

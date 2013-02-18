@@ -175,7 +175,9 @@ class DebuggerTask(Task):
         """ Start debugging the current file
         """
         editor = self.active_editor
-        self.debug_process = self.debugger_service.debug(editor.path)
+        # Get new debug process
+        self.debug_process = self.debugger_service.debug()
+        self.debug_process.Start(editor.path)
 
     def stop_debugger(self):
         """ Stop the currently running debug instance
@@ -205,6 +207,10 @@ class DebuggerTask(Task):
         """
         thread = self.debug_process._threads.values()[0]
         thread.StepOut()
+
+    @on_trait_change('debug_process:completedDebugging')
+    def completed_debugging(self):
+        self.debug_process = None
 
     @on_trait_change('debug_process:moduleLoaded')
     def module_loaded(self, filename):

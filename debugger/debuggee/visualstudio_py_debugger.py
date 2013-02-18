@@ -126,6 +126,31 @@ class _NetstringWrapper(object):
 
 _NetstringConn = _NetstringWrapper()
 
+class _Getch(object):
+    """Gets a single character from standard input.  Does not echo to the
+screen."""
+    def __init__(self):
+        try:
+            import msvcrt
+            self._impl = msvcrt.getch
+        except ImportError:
+            self._impl = self._unix_getch
+
+    def _unix_getch(self):
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+    def __call__(self): return self._impl()
+
+getch = _Getch()
+
 
 SEND_BREAK_COMPLETE = False
 
@@ -1794,10 +1819,9 @@ def new_external_thread():
     sys.settrace(thread.trace_func)
 
 def do_wait():
-    import msvcrt    
     sys.__stdout__.write('Press any key to continue . . . ')
     sys.__stdout__.flush()
-    msvcrt.getch()
+    getch()
 
 class _DebuggerOutput(object):
     """file like object which redirects output to the repl window."""

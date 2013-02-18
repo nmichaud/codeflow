@@ -180,7 +180,7 @@ class DebuggerTask(Task):
     def stop_debugger(self):
         """ Stop the currently running debug instance
         """
-        self.debugger_service.stop()
+        self.debug_process.Detach()
 
     def continue_debugger(self):
         """ Continue the currently running debug instance

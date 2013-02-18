@@ -121,6 +121,9 @@ class PythonProcess(HasStrictTraits):
         if len(self._threads) > 0:
             self._process.terminate()
 
+    def Detach(self):
+        self.protocol.send_DETC()
+
     # API used by other pieces
     def SendStepInto(self, thread_id):
         self.protocol.send_STPI(thread_id)

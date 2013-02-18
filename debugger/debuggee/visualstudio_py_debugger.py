@@ -1761,7 +1761,7 @@ def detach_threads():
 
     if not _INTERCEPTING_FOR_ATTACH:
         THREADS.clear()
-        
+
     BREAKPOINTS.clear()
 
     THREADS_LOCK.release()
@@ -1947,7 +1947,8 @@ def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, 
         finally:
             sys.settrace(None)
             THREADS_LOCK.acquire()
-            del THREADS[cur_thread.id]
+            if THREADS:
+                del THREADS[cur_thread.id]
             THREADS_LOCK.release()
             report_thread_exit(cur_thread)
 

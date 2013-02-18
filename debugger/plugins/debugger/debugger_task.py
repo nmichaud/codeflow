@@ -206,6 +206,29 @@ class DebuggerTask(Task):
         thread = self.debug_process._threads.values()[0]
         thread.StepOut()
 
+    @on_trait_change('debug_process:moduleLoaded')
+    def module_loaded(self, filename):
+        # send any breakpoints for that module
+        for editor in self.editor_area.editors:
+            if editor.path == filename:
+                for breakpoint in editor.breakpoints:
+                    bp = self.debug_process.AddBreakPoint(filename, breakpoint, '')
+                    bp.Add()
+
+    @on_trait_change('active_editor:breakpoints')
+    def added_breakpoint(self, name, event):
+        if self.debug_process:
+            editor = self.active_editor
+            for bp in event.added:
+                bp = self.debug_process.AddBreakPoint(editor.path, bp, '')
+                bp.Add()
+            for bp in event.removed:
+                # XXX This is ugly - probably need a breakpoint manager
+                for brkp in self.debug_process._breakpoints.values():
+                    if brkp.Filename == editor.path and brkp.LineNo == bp:
+                        self.debug_process.RemoveBreakPoint(brkp)
+                        break
+
     ###########################################################################
     # Protected interface.
     ###########################################################################

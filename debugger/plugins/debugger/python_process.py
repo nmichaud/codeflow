@@ -1,5 +1,6 @@
 # System imports
 import os, sys, subprocess, uuid
+import itertools
 
 # Enthought library imports
 from traits.api import (
@@ -20,6 +21,8 @@ class PythonProcess(HasStrictTraits):
     protocol = Instance(PyToolsProtocol)
 
     readyToDebug = Bool(False)
+
+    moduleLoaded = Event()
 
     @on_trait_change('protocol:processLoaded')
     def process_loaded(self, thread_id):
@@ -65,6 +68,10 @@ class PythonProcess(HasStrictTraits):
             _frames.append(frame)
         thread._frames = _frames
 
+    @on_trait_change('protocol:moduleLoaded')
+    def module_loaded(self, (module_id, filename)):
+        self.moduleLoaded = filename
+
     #_lineEvent
     #_ids = Instance(IdDispenser)
     #_pendingExecutes
@@ -100,7 +107,7 @@ class PythonProcess(HasStrictTraits):
                 str(self._processGuid),
                 #'--wait-on-exception',
                 #'--wait-on-exit',
-                '--redirect-output',
+                #'--redirect-output',
                 filename,
                 ]
 
@@ -135,6 +142,14 @@ class PythonProcess(HasStrictTraits):
 
     def Break(self):
         self.protocol.send_BRKA()
+
+    def AddBreakPoint(self, filename, lineNo, condition, breakWhenChanged = False):
+        bp = PythonBreakpoint(
+            _process=self, _filename=filename, _lineNo=lineNo,
+            _breakWhenChanged = breakWhenChanged, _condition=condition,
+            )
+        self._breakpoints[bp.Id] = bp
+        return bp
 
     def BindBreakPoint(self, breakpoint):
         self.protocol.send_BRKP(
@@ -271,6 +286,11 @@ class PythonBreakpoint(HasStrictTraits):
     _breakpointId = Int()
     _breakWhenChanged = Bool()
     _condition = Unicode()
+
+    _counter = itertools.count()
+
+    def __breakpointId_default(self):
+        return self._counter.next()
 
     def Add(self):
         self._process.BindBreakPoint(self)

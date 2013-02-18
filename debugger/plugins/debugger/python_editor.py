@@ -19,7 +19,9 @@ from os.path import basename
 from pyface.qt import QtCore, QtGui
 
 # Enthought library imports.
-from traits.api import Bool, Event, implements, Instance, File, Unicode, Property
+from traits.api import (
+    Bool, Event, implements, Instance, File, Unicode, Property, Set, Int
+    )
 from pyface.tasks.api import Editor
 from pyface.key_pressed_event import KeyPressedEvent
 
@@ -47,6 +49,8 @@ class PythonEditor(Editor):
     tooltip = Property(Unicode, depends_on='path')
 
     show_line_numbers = Bool(True)
+
+    breakpoints = Set(Int)
 
     #### Events ####
 
@@ -117,6 +121,13 @@ class PythonEditor(Editor):
                 self.show_line_numbers)
             self.control.code.update_line_number_width()
 
+    def _breakpoints_items_changed(self):
+        self._breakpoints_changed(self.breakpoints)
+
+    def _breakpoints_changed(self, new):
+        if self.control is not None:
+            self.control.code.breakpoints_widget.setBreakpoints(new)
+
     ###########################################################################
     # Private interface.
     ###########################################################################
@@ -135,11 +146,18 @@ class PythonEditor(Editor):
         # Connect signals for text changes.
         control.code.modificationChanged.connect(self._on_dirty_changed)
         control.code.textChanged.connect(self._on_text_changed)
+        control.code.breakpointClicked.connect(self._breakpoint_clicked)
 
         # Load the editor's contents.
         self.load()
 
         return control
+
+    def _breakpoint_clicked(self, line):
+        if line in self.breakpoints:
+            self.breakpoints.remove(line)
+        else:
+            self.breakpoints.add(line)
 
     def _on_dirty_changed(self, dirty):
         """ Called whenever a change is made to the dirty state of the

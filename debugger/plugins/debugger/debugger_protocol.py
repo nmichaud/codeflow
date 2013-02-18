@@ -458,7 +458,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             breakpoint id: int
             thread id: long
         """
-        brkpt_id, thread_id = struct.unpack('il', bytes)
+        brkpt_id, = struct.unpack('i', bytes[:4])
+        thread_id, = struct.unpack('l', bytes[4:])
         self.breakpointHit = (thread_id, brkpt_id)
 
     def receive_LOAD(self, bytes):

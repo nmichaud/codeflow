@@ -90,23 +90,31 @@ class StatusGutterWidget(GutterWidget):
                 QtCore.QRect(0, line*pixels_per_block, self.width(), 3),
                 QtCore.Qt.red)
 
-class BreakpointsWidget(GutterWidget):
+class CodeGutterWidget(GutterWidget):
     """ Draw breakpoints
     """
 
     margin = 2
 
     _breakpoints = set()
+    _timings = set()
 
     def __init__(self, *args, **kw):
-        super(BreakpointsWidget, self).__init__(*args, **kw)
+        super(CodeGutterWidget, self).__init__(*args, **kw)
 
         self._bp_pixmap = QtGui.QPixmap(join(dirname(__file__),'images','bp.png'))
+        self._timing_pixmap = QtGui.QPixmap(join(dirname(__file__),'images','timing.png'))
 
     def setBreakpoints(self, breakpoints):
         """ Set the list of breakpoints
         """
         self._breakpoints = set(breakpoints)
+        self.update()
+
+    def setTimings(self, timings):
+        """ Set the list of timing locations
+        """
+        self._timings = set(timings)
         self.update()
 
     def gutter_width(self):
@@ -145,9 +153,14 @@ class BreakpointsWidget(GutterWidget):
                                      curr_block_color)
                     painter.setOpacity(symbol_opacity)
 
-                if (block.blockNumber()+1) in self._breakpoints:
+                blockNum = block.blockNumber() + 1
+
+                if blockNum in self._breakpoints:
                     # Draw breakpoint
                     painter.drawPixmap(self.margin, top+(height-wrect.height())/2, self._bp_pixmap)
+                elif blockNum in self._timings:
+                    # Draw breakpoint
+                    painter.drawPixmap(self.margin, top+(height-wrect.height())/2, self._timing_pixmap)
 
             block = block.next()
             geometry = cw.blockBoundingGeometry(block).translated(cw_offset)

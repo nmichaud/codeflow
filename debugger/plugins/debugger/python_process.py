@@ -17,6 +17,7 @@ class PythonProcess(HasStrictTraits):
     _process = Instance(subprocess.Popen)
     _threads = Dict() #(int, PythonThread)
     _breakpoints = Dict() #(int, PythonBreakpoint)
+    _timings = Dict()
 
     protocol = Instance(PyToolsProtocol)
     port = Int()
@@ -148,6 +149,24 @@ class PythonProcess(HasStrictTraits):
 
     def Break(self):
         self.protocol.send_BRKA()
+
+    def AddTimingPoint(self, filename, lineNo):
+        tp = PythonTimingPoint(
+            _process=self, _filename=filename, _lineNo=lineNo
+            )
+        self._timings[tp.Id] = tp
+        return tp
+
+    def BindTimingPoint(self, timing):
+        self.protocol.send_BYLT(
+            timing.Id, timing.LineNo, timing.Filename
+        )
+
+    def RemoveTimingPoint(self, timing):
+        self._timings.pop(timing.Id)
+        self.protocol.send_BYLR(
+            timing.Id, timing.LineNo
+            )
 
     def AddBreakPoint(self, filename, lineNo, condition, breakWhenChanged = False):
         bp = PythonBreakpoint(
@@ -284,6 +303,28 @@ class PythonThread(HasStrictTraits):
         self._process.SendResumeThread(self._identity)
     def ClearSteppingState(self):
         self._process.SendClearStepping(self._identity)
+
+class PythonTimingPoint(HasStrictTraits):
+    _process = WeakRef() # PythonProcess
+    _filename = Unicode()
+    _lineNo = Int()
+
+    _timingId = Int()
+
+    _counter = itertools.count()
+
+    def _timingId_default(self):
+        return self._counter.next()
+
+    def Add(self):
+        self._process.BindTimingPoint(self)
+
+    def Remove(self):
+        self._process.RemoveTimingPoint(self)
+
+    Filename = property(lambda self: self._filename)
+    LineNo = property(lambda self: self._lineNo)
+    Id = property(lambda self: self._timingId)
 
 
 class PythonBreakpoint(HasStrictTraits):

@@ -25,6 +25,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
     breakpointHit = Event()
     breakpointBindSucceeded = Event()
     breakpointBindFailed = Event()
+    timingStats = Event()
     setLineNoComplete = Event()
     debuggerOutput = Event()
     threadFrameList = Event()
@@ -47,7 +48,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         # Unpack the msg
         code = msg[:4]
         # Dispatch code
-        getattr(self, 'receive_%s'%code)(msg[4:])
+        func = getattr(self, 'receive_%s'%code, None)
+        if func:
+            func(msg[4:])
 
     def lengthLimitExceeded(self, length):
         PyToolsProtocol.lengthLimitExceeded(self, length)
@@ -83,6 +86,30 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         self.transport.write('stpv')
         self.transport.write(struct.pack('!Q', thread_id))
+
+    def send_BYLT(self, timing_id, line_no, filename):
+        """ Set line timing command
+
+        Data format:
+        ------------
+            timing id: int
+            line number: int
+            filename: string
+        """
+        self.transport.write('bylt')
+        self.transport.write(struct.pack('!II', timing_id, line_no))
+        self._write_string(filename)
+
+    def send_BYLR(self, timing_id, line_no):
+        """ Remove timing command
+
+        Data format:
+        ------------
+            timing id: int
+            line number: int
+        """
+        self.transport.write('bylr')
+        self.transport.write(struct.pack('!II', line_no, timing_id))
 
     def send_BRKP(self, brkpt_id, line_no, filename, condition, break_when_changed):
         """ Set breakpoint command
@@ -365,6 +392,40 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             frames.append((flineno,lineno,curlineno,framename,filename,argcount,vars))
         assert(len(bytes) == 0)
         self.threadFrameList = (thread_id, tname, frames)
+
+    def receive_BLPS(self, bytes):
+        """ Timing stats message
+
+        Data format:
+        ------------
+            unit: float
+            num functions: int
+            Functions:
+                filename: string
+                start_lineno: int
+                function name: string
+                Timings:
+                    lineno: int
+                    number of hits: int
+                    time: float
+        """
+        unit, fcount = struct.unpack('!fI', bytes[:8])
+        bytes = bytes[8:]
+        funcs = []
+        for f_i in range(fcount):
+            filename, bytes = self._read_string(bytes)
+            start_lineno, = struct.unpack('!I', bytes[:4])
+            func_name, bytes = self._read_string(bytes[4:])
+            ntimings, = struct.unpack('!I', bytes[:4])
+            bytes = bytes[4:]
+            timings = []
+            for t_i in range(ntimings):
+                lineno, nhits, time = struct.unpack('!IIf', bytes[:12])
+                timings.append((lineno, nhits, time))
+                bytes = bytes[12:]
+            funcs.append((filename, start_lineno, func_name, timings))
+        assert(len(bytes) == 0)
+        self.timingStats = funcs
 
     def receive_DETC(self, bytes):
         """ Detach message (process exited)

@@ -52,6 +52,8 @@ class PythonEditor(Editor):
 
     breakpoints = Set(Int)
 
+    timings = Set(Int)
+
     #### Events ####
 
     changed = Event
@@ -126,7 +128,14 @@ class PythonEditor(Editor):
 
     def _breakpoints_changed(self, new):
         if self.control is not None:
-            self.control.code.breakpoints_widget.setBreakpoints(new)
+            self.control.set_breakpoints(new)
+
+    def _timings_items_changed(self):
+        self._timings_changed(self.timings)
+
+    def _timings_changed(self, new):
+        if self.control is not None:
+            self.control.set_timings(new)
 
     ###########################################################################
     # Private interface.
@@ -146,18 +155,25 @@ class PythonEditor(Editor):
         # Connect signals for text changes.
         control.code.modificationChanged.connect(self._on_dirty_changed)
         control.code.textChanged.connect(self._on_text_changed)
-        control.code.breakpointClicked.connect(self._breakpoint_clicked)
+        control.code.codeGutterClicked.connect(self._code_gutter_clicked)
 
         # Load the editor's contents.
         self.load()
 
         return control
 
-    def _breakpoint_clicked(self, line):
+    def _code_gutter_clicked(self, line):
         if line in self.breakpoints:
             self.breakpoints.remove(line)
+        elif line in self.timings:
+            self.timings.remove(line)
         else:
-            self.breakpoints.add(line)
+            # Figure out whether it's a function or not
+            text = self.control.code.document().findBlockByLineNumber(line-1).text()
+            if 'def' in text:
+                self.timings.add(line)
+            else:
+                self.breakpoints.add(line)
 
     def _on_dirty_changed(self, dirty):
         """ Called whenever a change is made to the dirty state of the

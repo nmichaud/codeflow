@@ -25,6 +25,7 @@ import weakref
 import traceback
 import types
 import bisect
+import _line_profiler
 try:
     import visualstudio_py_repl
 except ImportError:
@@ -69,6 +70,7 @@ except:
 # dictionary of line no to break point info
 BREAKPOINTS = {}
 DJANGO_BREAKPOINTS = {}
+TIMING_POINTS = {}
 
 BREAK_WHEN_CHANGED_DUMMY = object()
 # lock for calling .send on the socket
@@ -200,6 +202,9 @@ EXIT = cmd('EXIT')
 EXCP = cmd('EXCP')
 MODL = cmd('MODL')
 STPD = cmd('STPD')
+BLTS = cmd('BLTS')
+BLTF = cmd('BLTF')
+BLPS = cmd('BLPS')
 BRKS = cmd('BRKS')
 BRKF = cmd('BRKF')
 BRKH = cmd('BRKH')
@@ -512,6 +517,7 @@ class Thread(object):
         self.trace_func_stack = []
         self.reported_process_loaded = False
         self.django_stepping = None
+        self.collect_timings = set()
         if sys.platform == 'cli':
             self.frames = []
     
@@ -554,6 +560,16 @@ class Thread(object):
     def handle_call(self, frame, arg):
         self.push_frame(frame)
 
+        if TIMING_POINTS:
+            tp = TIMING_POINTS.get(frame.f_lineno)
+            if tp is not None:
+                for (filename, tp_id), bound in tp.items():
+                    if filename == frame.f_code.co_filename or (not bound and filename_is_same(filename, frame.f_code.co_filename)):
+                        # Start collecting timing data
+                        LINE_PROFILER.add_func_code(frame.f_code)
+                        self.collect_timings.add(frame.f_code)
+                        break
+
         if DJANGO_BREAKPOINTS:
             source_obj = get_django_frame_source(frame)
             if source_obj is not None:
@@ -585,6 +601,13 @@ class Thread(object):
                     if check_break_point(code.co_filename, module, pending_bp.brkpt_id, pending_bp.lineNo, pending_bp.filename, pending_bp.condition, pending_bp.break_when_changed):
                         bound.add(pending_bp)
                 PENDING_BREAKPOINTS -= bound
+
+                bound = set()
+                global PENDING_TIMING_POINTS
+                for pending_tp in PENDING_TIMING_POINTS:
+                    if check_timing_point(code.co_filename, module, pending_tp.timing_id, pending_tp.lineNo, pending_tp.filename):
+                        bound.add(pending_tp)
+                PENDING_TIMING_POINTS -= bound
 
         stepping = self.stepping
         if stepping is not STEPPING_NONE:
@@ -659,6 +682,10 @@ class Thread(object):
                                 self.block(lambda: (report_breakpoint_hit(bp_id, self.id), mark_all_threads_for_break()))
                             break
 
+        if frame.f_code in self.collect_timings:
+            # Call into line_profiler
+            _line_profiler._trace_callback(LINE_PROFILER, frame)
+
         # forward call to previous trace function, if any, updating trace function appropriately
         old_trace_func = self.prev_trace_func
         if old_trace_func is not None:
@@ -689,6 +716,8 @@ class Thread(object):
                         self.stepping = STEPPING_NONE
                         update_all_thread_stacks(self)
                         self.block(lambda: report_step_finished(self.id))
+            if frame.f_code in self.collect_timings:
+                self.collect_timings.remove(frame.f_code)
 
         # forward call to previous trace function, if any
         old_trace_func = self.prev_trace_func
@@ -1142,6 +1171,30 @@ def get_code(func):
 
 class DebuggerExitException(Exception): pass
 
+LINE_PROFILER = _line_profiler.LineProfiler()
+
+def add_timing_point(modFilename, lineNo, timing_id, bound = True):
+    cur_tm = TIMING_POINTS.get(lineNo)
+    if cur_tm is None:
+        cur_tm = TIMING_POINTS[lineNo] = dict()
+
+    cur_tm[(modFilename, timing_id)] = bound
+
+def check_timing_point(modFilename, module, timing_id, lineNo, filename):
+    if module.filename.lower() == path.abspath(filename).lower():
+        add_timing_point(modFilename, lineNo, timing_id)
+        report_timing_bound(timing_id)
+        return True
+    return False
+
+class PendingTimingPoint(object):
+    def __init__(self, timing_id, lineNo, filename):
+        self.timing_id = timing_id
+        self.lineNo = lineNo
+        self.filename = filename
+
+PENDING_TIMING_POINTS = set()
+
 def add_break_point(modFilename, break_when_changed, condition, lineNo, brkpt_id, bound = True):
     cur_bp = BREAKPOINTS.get(lineNo)
     if cur_bp is None:
@@ -1202,6 +1255,8 @@ class DebuggerLoop(object):
             cmd('bkda') : self.command_add_django_breakpoint,
             cmd('crep') : self.command_connect_repl,
             cmd('drep') : self.command_disconnect_repl,
+            cmd('bylt') : self.command_set_by_line_timing,
+            cmd('bylr') : self.command_remove_by_line_timing,
         }
 
     def loop(self):
@@ -1250,6 +1305,47 @@ class DebuggerLoop(object):
 
             thread.stepping = STEPPING_OVER
             self.command_resume_all()
+
+    def command_set_by_line_timing(self):
+        timing_id = read_int(self.conn)
+        lineNo = read_int(self.conn)
+        filename = read_string(self.conn)
+
+        for modFilename, module in MODULES:
+            if check_timing_point(modFilename, module, timing_id, lineNo, filename):
+                break
+        else:
+            # failed to setup timing
+            add_timing_point(filename, lineNo, timing_id, False)
+            PENDING_TIMING_POINTS.add(PendingTimingPoint(timing_id, lineNo, filename))
+            report_timing_failed(timing_id)
+
+    def command_remove_by_line_timing(self):
+        lineNo = read_int(self.conn)
+        timing_id = read_int(self.conn)
+
+        cur_tp = TIMING_POINTS.get(lineNo)
+        if cur_tp is not None:
+            for file, id in cur_tp:
+                if id == timing_id:
+                    del cur_tp[file, id]
+                    if not cur_tp:
+                        del TIMING_POINTS[lineNo]
+                    break
+
+    def command_set_breakpoint(self):
+        brkpt_id = read_int(self.conn)
+        lineNo = read_int(self.conn)
+        timing_id = read_int(self.conn)
+
+        cur_tp = TIMING_POINTS.get(lineNo)
+        if cur_tp is not None:
+            for file, id in cur_tp:
+                if id == timing_id:
+                    del cur_tp[file, id]
+                    if not cur_tp:
+                        del TIMING_POINTS[lineNo]
+                    break
 
     def command_set_breakpoint(self):
         brkpt_id = read_uint(self.conn)
@@ -1541,6 +1637,22 @@ def report_thread_exit(old_thread):
         conn.send(EXTT)
         conn.send(struct.pack('!Q', ident))
 
+def report_line_profiles():
+    stats = LINE_PROFILER.get_stats()
+    with _SendLockCtx, _NetstringConn as conn:
+        conn.send(BLPS)
+        conn.send(struct.pack('!f', stats.unit))
+        conn.send(struct.pack('!I', len(stats.timings)))
+        for (filename, start_lineno, name), timings in sorted(stats.timings.items()):
+            write_string(conn, filename)
+            conn.send(struct.pack('!I', start_lineno))
+            write_string(conn, name)
+            conn.send(struct.pack('!I', len(timings)))
+            for lineno, nhits, time in timings:
+                conn.send(struct.pack('!I', lineno))
+                conn.send(struct.pack('!I', nhits))
+                conn.send(struct.pack('!f', time))
+
 def report_exception(frame, exc_info, tid, break_type):
     exc_type = exc_info[0]
     exc_value = exc_info[1]
@@ -1577,6 +1689,16 @@ def report_step_finished(tid):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(STPD)
         conn.send(struct.pack('!Q', tid))
+
+def report_timing_bound(id):
+    with _SendLockCtx, _NetstringConn as conn:
+        conn.send(BLTS)
+        conn.send(struct.pack('!I', id))
+
+def report_timing_failed(id):
+    with _SendLockCtx, _NetstringConn as conn:
+        conn.send(BLTF)
+        conn.send(struct.pack('!I', id))
 
 def report_breakpoint_bound(id):
     with _SendLockCtx, _NetstringConn as conn:
@@ -1977,6 +2099,7 @@ def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, 
             if THREADS:
                 del THREADS[cur_thread.id]
             THREADS_LOCK.release()
+            report_line_profiles()
             report_thread_exit(cur_thread)
 
         if wait_on_exit:

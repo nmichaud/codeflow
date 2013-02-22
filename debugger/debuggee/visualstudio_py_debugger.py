@@ -684,7 +684,7 @@ class Thread(object):
 
         if frame.f_code in self.collect_timings:
             # Call into line_profiler
-            _line_profiler._trace_callback(LINE_PROFILER, frame)
+            _line_profiler._line_trace(LINE_PROFILER, frame)
 
         # forward call to previous trace function, if any, updating trace function appropriately
         old_trace_func = self.prev_trace_func
@@ -717,6 +717,7 @@ class Thread(object):
                         update_all_thread_stacks(self)
                         self.block(lambda: report_step_finished(self.id))
             if frame.f_code in self.collect_timings:
+                _line_profiler._return_trace(LINE_PROFILER, frame)
                 self.collect_timings.remove(frame.f_code)
 
         # forward call to previous trace function, if any

@@ -726,6 +726,9 @@ class AdvancedCodeWidget(QtGui.QWidget):
     def set_timings(self, timings):
         self.code.overlay_widget.setTimings(timings)
 
+    def clear_timings(self):
+        self.code.overlay_widget.setTimings([])
+
     def ensureCursorVisible(self):
         self.code.ensureCursorVisible()
 

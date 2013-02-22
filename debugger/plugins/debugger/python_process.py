@@ -5,7 +5,7 @@ import itertools
 # Enthought library imports
 from traits.api import (
     HasStrictTraits, Any, Event, Instance, Dict, List, Unicode, Bool, Int,
-    Property, WeakRef, on_trait_change,
+    Property, WeakRef, DelegatesTo, on_trait_change,
     )
 
 # Local imports
@@ -17,7 +17,7 @@ class PythonProcess(HasStrictTraits):
     _process = Instance(subprocess.Popen)
     _threads = Dict() #(int, PythonThread)
     _breakpoints = Dict() #(int, PythonBreakpoint)
-    _timings = Dict()
+    _timing_points = Dict()
 
     protocol = Instance(PyToolsProtocol)
     port = Int()
@@ -25,6 +25,7 @@ class PythonProcess(HasStrictTraits):
     readyToDebug = Bool(False)
 
     moduleLoaded = Event()
+    timingStats = Event()
     completedDebugging = Event()
 
     @on_trait_change('protocol:processLoaded')
@@ -75,6 +76,10 @@ class PythonProcess(HasStrictTraits):
     @on_trait_change('protocol:moduleLoaded')
     def module_loaded(self, (module_id, filename)):
         self.moduleLoaded = filename
+
+    @on_trait_change('protocol:timingStats')
+    def timing_stats(self, stats):
+        self.timingStats = stats
 
     #_lineEvent
     #_ids = Instance(IdDispenser)
@@ -154,7 +159,7 @@ class PythonProcess(HasStrictTraits):
         tp = PythonTimingPoint(
             _process=self, _filename=filename, _lineNo=lineNo
             )
-        self._timings[tp.Id] = tp
+        self._timing_points[tp.Id] = tp
         return tp
 
     def BindTimingPoint(self, timing):
@@ -163,7 +168,7 @@ class PythonProcess(HasStrictTraits):
         )
 
     def RemoveTimingPoint(self, timing):
-        self._timings.pop(timing.Id)
+        self._timing_points.pop(timing.Id)
         self.protocol.send_BYLR(
             timing.Id, timing.LineNo
             )

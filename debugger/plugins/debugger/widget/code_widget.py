@@ -19,6 +19,7 @@ from pyface.qt import QtCore, QtGui
 # Local imports
 from find_widget import FindWidget
 from gutters import LineNumberWidget, StatusGutterWidget, CodeGutterWidget
+from code_overlay import CodeOverlay
 from replace_widget import ReplaceWidget
 from pygments_highlighter import PygmentsHighlighter
 
@@ -40,6 +41,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
         self.line_number_widget = LineNumberWidget(self)
         self.codegutter_widget = CodeGutterWidget(self)
         self.status_widget = StatusGutterWidget(self)
+        self.overlay_widget = CodeOverlay(self)
 
         if font is None:
             # Set a decent fixed width font for this platform.
@@ -71,13 +73,13 @@ class CodeWidget(QtGui.QPlainTextEdit):
         self.comment_character = '#'
 
         # Set up gutter widget and current line highlighting
-        self.blockCountChanged.connect(self.update_line_number_width)
-        self.updateRequest.connect(self.update_line_numbers)
+        self.blockCountChanged.connect(self._update_viewport_margins)
+        self.updateRequest.connect(self._update_gutters)
 
         # Set up breakpoint signals
         self.codegutter_widget.gutterClicked.connect(self.codeGutterClicked)
 
-        self.update_line_number_width()
+        self._update_viewport_margins()
 
         # Don't wrap text
         self.setLineWrapMode(QtGui.QPlainTextEdit.NoWrap)
@@ -135,9 +137,9 @@ class CodeWidget(QtGui.QPlainTextEdit):
         """
         self.document().setDefaultFont(font)
         self.line_number_widget.set_font(font)
-        self.update_line_number_width()
+        self._update_viewport_margins()
 
-    def update_line_number_width(self, nblocks=0):
+    def _update_viewport_margins(self, nblocks=0):
         """ Update the width of the line number widget.
         """
         left = 0
@@ -147,7 +149,7 @@ class CodeWidget(QtGui.QPlainTextEdit):
             left += self.line_number_widget.gutter_width()
         self.setViewportMargins(left, 0, 0, 0)
 
-    def update_line_numbers(self, rect, dy):
+    def _update_gutters(self, rect, dy):
         """ Update the line numbers.
         """
         if dy:
@@ -157,8 +159,10 @@ class CodeWidget(QtGui.QPlainTextEdit):
             0, rect.y(), self.line_number_widget.width(), rect.height())
         self.codegutter_widget.update(
             0, rect.y(), self.codegutter_widget.width(), rect.height())
-        if rect.contains(self.viewport().rect()):
-            self.update_line_number_width()
+        self.overlay_widget.update(
+            0, rect.y(), self.overlay_widget.width(), rect.height())
+        #if rect.contains(self.viewport().rect()):
+        #    self._update_viewport_margins()
 
     def set_info_lines(self, info_lines):
         self.status_widget.info_lines = info_lines
@@ -407,14 +411,22 @@ class CodeWidget(QtGui.QPlainTextEdit):
     def resizeEvent(self, event):
         QtGui.QPlainTextEdit.resizeEvent(self, event)
         contents = self.contentsRect()
+
         left = contents.left()
+
+        width = self.codegutter_widget.gutter_width()
         self.codegutter_widget.setGeometry(QtCore.QRect(left,
-            contents.top(), self.codegutter_widget.gutter_width(),
+            contents.top(), width,
             contents.height()))
-        left += self.codegutter_widget.gutter_width()
+
+        left += width
+
+        width = self.line_number_widget.gutter_width()
         self.line_number_widget.setGeometry(QtCore.QRect(left,
-            contents.top(), self.line_number_widget.gutter_width(),
+            contents.top(), width,
             contents.height()))
+
+        left += width
 
         # use the viewport width to determine the right edge. This allows for
         # the propper placement w/ and w/o the scrollbar
@@ -423,6 +435,10 @@ class CodeWidget(QtGui.QPlainTextEdit):
                     - self.status_widget.sizeHint().width()
         self.status_widget.setGeometry(QtCore.QRect(right_pos,
             contents.top(), self.status_widget.sizeHint().width(),
+            contents.height()))
+
+        self.overlay_widget.setGeometry(QtCore.QRect(
+            left, contents.top(), self.viewport().width(),
             contents.height()))
 
     def sizeHint(self):
@@ -704,8 +720,11 @@ class AdvancedCodeWidget(QtGui.QWidget):
     def set_breakpoints(self, breakpoints):
         self.code.codegutter_widget.setBreakpoints(breakpoints)
 
+    def set_timing_points(self, timing_points):
+        self.code.codegutter_widget.setTimings(timing_points)
+
     def set_timings(self, timings):
-        self.code.codegutter_widget.setTimings(timings)
+        self.code.overlay_widget.setTimings(timings)
 
     def ensureCursorVisible(self):
         self.code.ensureCursorVisible()

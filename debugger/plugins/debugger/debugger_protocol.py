@@ -411,7 +411,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         unit, fcount = struct.unpack('!fI', bytes[:8])
         bytes = bytes[8:]
-        funcs = []
+        stats = []
         for f_i in range(fcount):
             filename, bytes = self._read_string(bytes)
             start_lineno, = struct.unpack('!I', bytes[:4])
@@ -423,9 +423,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                 lineno, nhits, time = struct.unpack('!IIf', bytes[:12])
                 timings.append((lineno, nhits, time))
                 bytes = bytes[12:]
-            funcs.append((filename, start_lineno, func_name, timings))
+            stats.append((filename, start_lineno, func_name, timings))
         assert(len(bytes) == 0)
-        self.timingStats = funcs
+        self.timingStats = stats
 
     def receive_DETC(self, bytes):
         """ Detach message (process exited)

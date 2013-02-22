@@ -20,7 +20,8 @@ from pyface.qt import QtCore, QtGui
 
 # Enthought library imports.
 from traits.api import (
-    Bool, Event, implements, Instance, File, Unicode, Property, Set, Int
+    Bool, Event, implements, Instance, File, Unicode, Property, Set, Int,
+    Dict,
     )
 from pyface.tasks.api import Editor
 from pyface.key_pressed_event import KeyPressedEvent
@@ -48,11 +49,11 @@ class PythonEditor(Editor):
 
     tooltip = Property(Unicode, depends_on='path')
 
-    show_line_numbers = Bool(True)
-
     breakpoints = Set(Int)
 
-    timings = Set(Int)
+    timing_points = Set(Int)
+
+    timings = Dict()
 
     #### Events ####
 
@@ -117,12 +118,6 @@ class PythonEditor(Editor):
         if self.control is not None:
             self.load()
 
-    def _show_line_numbers_changed(self):
-        if self.control is not None:
-            self.control.code.line_number_widget.setVisible(
-                self.show_line_numbers)
-            self.control.code.update_line_number_width()
-
     def _breakpoints_items_changed(self):
         self._breakpoints_changed(self.breakpoints)
 
@@ -130,8 +125,12 @@ class PythonEditor(Editor):
         if self.control is not None:
             self.control.set_breakpoints(new)
 
-    def _timings_items_changed(self):
-        self._timings_changed(self.timings)
+    def _timing_points_items_changed(self):
+        self._timing_points_changed(self.timing_points)
+
+    def _timing_points_changed(self, new):
+        if self.control is not None:
+            self.control.set_timing_points(new)
 
     def _timings_changed(self, new):
         if self.control is not None:
@@ -145,7 +144,6 @@ class PythonEditor(Editor):
         """ Creates the toolkit-specific control for the widget.
         """
         self.control = control = AdvancedCodeWidget(parent)
-        self._show_line_numbers_changed()
 
         # Install event filter to trap key presses.
         #event_filter = PythonEditorEventFilter(self, self.control)
@@ -165,13 +163,13 @@ class PythonEditor(Editor):
     def _code_gutter_clicked(self, line):
         if line in self.breakpoints:
             self.breakpoints.remove(line)
-        elif line in self.timings:
-            self.timings.remove(line)
+        elif line in self.timing_points:
+            self.timing_points.remove(line)
         else:
             # Figure out whether it's a function or not
             text = self.control.code.document().findBlockByLineNumber(line-1).text()
             if 'def' in text:
-                self.timings.add(line)
+                self.timing_points.add(line)
             else:
                 self.breakpoints.add(line)
 

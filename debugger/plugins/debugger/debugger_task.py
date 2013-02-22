@@ -239,9 +239,21 @@ class DebuggerTask(Task):
                 for breakpoint in editor.breakpoints:
                     bp = self.debug_process.AddBreakPoint(filename, breakpoint, '')
                     bp.Add()
-                for timing in editor.timings:
+                for timing in editor.timing_points:
                     tp = self.debug_process.AddTimingPoint(filename, timing)
                     tp.Add()
+
+    @on_trait_change('debug_process:timingStats')
+    def timing_stats(self, stats):
+        for editor in self.editor_area.editors:
+            file_timings = {}
+            for filename, start_line, name, timings in stats:
+                if editor.path == filename:
+                    total = sum([t[2] for t in timings])
+                    file_timings.update(
+                        dict([(lineno, (nhits, time, time/nhits, 100*time/total)) for
+                                lineno, nhits, time in timings]))
+            editor.timings = file_timings
 
     @on_trait_change('active_editor:breakpoints')
     def added_breakpoint(self, name, event):
@@ -257,7 +269,7 @@ class DebuggerTask(Task):
                         self.debug_process.RemoveBreakPoint(brkp)
                         break
 
-    @on_trait_change('active_editor:timings')
+    @on_trait_change('active_editor:timing_points')
     def added_timing(self, name, event):
         if self.debug_process:
             editor = self.active_editor
@@ -266,7 +278,7 @@ class DebuggerTask(Task):
                 tp.Add()
             for tp in event.removed:
                 # XXX This is ugly - probably need a breakpoint manager
-                for tps in self.debug_process._timings.values():
+                for tps in self.debug_process._timing_points.values():
                     if tps.Filename == editor.path and tps.LineNo == tp:
                         self.debug_process.RemoveTimingPoint(tps)
                         break

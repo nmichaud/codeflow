@@ -9,6 +9,7 @@
 # Description: <Enthought pyface code editor>
 #------------------------------------------------------------------------------
 
+import math
 from pyface.qt import QtCore, QtGui
 
 
@@ -62,6 +63,14 @@ class CodeOverlay(QtGui.QWidget):
         self.repaint()
 
     animate = QtCore.Property(float, fget=lambda self: self._animate, fset=set_animate)
+
+    def calc_color(self, percent):
+        start = 255, 0, 100
+        end = 0, 100, 255
+        red = (percent*start[0] + (1-percent)*end[0])
+        green = (percent*start[1] + (1-percent)*end[1])
+        blue = (percent*start[2] + (1-percent)*end[2])
+        return QtGui.QColor(red, green, blue, 50)
 
     def paintEvent(self, event):
         """ Paint the timings
@@ -137,7 +146,11 @@ class CodeOverlay(QtGui.QWidget):
                             left = rect.right() - width
                         rect.setWidth(width)
                         rect.moveLeft(left)
-                        painter.setPen(timing_bg)
+                        nhits, time, per_hit, percent = timings
+
+                        color = self.calc_color(percent*0.01)
+                        painter.setBrush(color)
+                        painter.setPen(color)
                         painter.drawRoundedRect(rect,8,8)
                         # Draw a line back to the text
                         painter.setPen(line_pen)
@@ -145,7 +158,7 @@ class CodeOverlay(QtGui.QWidget):
                         painter.drawLine(txt_width + adjust, y, rect.left(), y)
 
                         rect.adjust(adjust, 0, -adjust, 0)
-                        nhits, time, per_hit, percent = timings
+                        painter.setPen(QtCore.Qt.black)
                         painter.drawText(rect,
                             QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter,
                             template % (nhits, time, '%5.1f'%per_hit, '%5.1f'%percent))

@@ -18,7 +18,7 @@ class DebuggerApplication(TasksApplication):
     id = 'canopy.debugger'
 
     # The application's user-visible name.
-    name = 'Debugger'
+    name = 'CodeFlow'
 
     #### 'TasksApplication' interface #########################################
 

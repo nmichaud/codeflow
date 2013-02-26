@@ -45,7 +45,7 @@ class DebuggerTask(Task):
     #### Task interface #######################################################
 
     id = 'debugger.debugger_task'
-    name = 'Debugging Editor'
+    name = 'Editor'
 
     active_editor = Property(Instance(IEditor),
                              depends_on='editor_area.active_editor')

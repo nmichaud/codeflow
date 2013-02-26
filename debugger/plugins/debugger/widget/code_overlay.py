@@ -112,6 +112,11 @@ class CodeOverlay(QtGui.QWidget):
             orig_width = width = msgFontMetrics.width(header) + adjust*2
 
             timings_shown = False
+
+            # For long blocks, the geometry extends past the edge of the viewport widget
+            # We'll intersect it with the viewport bounds
+            bounds = cw.viewport().rect()
+
             while block.isValid() and top <= event.rect().bottom():
                 if block.isVisible() and bottom >= event.rect().top():
                     blockNum = block.blockNumber() + 1
@@ -123,7 +128,7 @@ class CodeOverlay(QtGui.QWidget):
 
                         txt_width = textFontMetrics.width(block.text())
 
-                        rect = QtCore.QRectF(geometry).adjusted(0,2,-right_margin, -1)
+                        rect = QtCore.QRectF(geometry).intersected(bounds).adjusted(0,2,-right_margin, -1)
                         if animate:
                             left = (rect.right()-orig_width)*(animate) + (txt_width+adjust)*(1-animate)
                         else:
@@ -162,7 +167,7 @@ class CodeOverlay(QtGui.QWidget):
 
                 if animate:
                     width *= animate
-                rect = QtCore.QRectF(geometry).adjusted(0, 2,-right_margin, -1)
+                rect = QtCore.QRectF(geometry).intersected(bounds).adjusted(0,2,-right_margin, -1)
                 if animate:
                     left = (rect.right()-orig_width)*(animate) + (adjust)*(1-animate)
                 else:

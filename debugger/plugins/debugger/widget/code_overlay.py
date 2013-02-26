@@ -65,12 +65,14 @@ class CodeOverlay(QtGui.QWidget):
     animate = QtCore.Property(float, fget=lambda self: self._animate, fset=set_animate)
 
     def calc_color(self, percent):
-        start = 255, 0, 100
-        end = 0, 100, 255
-        red = (percent*start[0] + (1-percent)*end[0])
-        green = (percent*start[1] + (1-percent)*end[1])
-        blue = (percent*start[2] + (1-percent)*end[2])
-        return QtGui.QColor(red, green, blue, 50)
+        start = 254, 224, 210
+        end = 222, 45, 38
+        alpha = 150./255
+        premul = 255*(1-alpha)
+        red = ((1-percent)*start[0] + percent*end[0])*alpha + premul
+        green = ((1-percent)*start[1] + percent*end[1])*alpha + premul
+        blue = ((1-percent)*start[2] + percent*end[2])*alpha + premul
+        return QtGui.QColor(red, green, blue)
 
     def paintEvent(self, event):
         """ Paint the timings
@@ -129,6 +131,13 @@ class CodeOverlay(QtGui.QWidget):
 
             line_pen = QtGui.QPen(timing_bg, 2, QtCore.Qt.DotLine)
 
+            # Skip the first block
+
+            block = block.next()
+            geometry = cw.blockBoundingGeometry(block).translated(offset)
+            top = geometry.top()
+            bottom = top + geometry.height()
+
             while block.isValid() and top <= event.rect().bottom():
                 if block.isVisible() and bottom >= event.rect().top():
                     blockNum = block.blockNumber() + 1
@@ -148,14 +157,15 @@ class CodeOverlay(QtGui.QWidget):
                         rect.moveLeft(left)
                         nhits, time, per_hit, percent = timings
 
-                        color = self.calc_color(percent*0.01)
-                        painter.setBrush(color)
-                        painter.setPen(color)
-                        painter.drawRoundedRect(rect,8,8)
                         # Draw a line back to the text
                         painter.setPen(line_pen)
                         y = rect.center().y()
                         painter.drawLine(txt_width + adjust, y, rect.left(), y)
+                        # Draw rect
+                        color = self.calc_color(percent*0.01)
+                        painter.setPen(color)
+                        painter.setBrush(color)
+                        painter.drawRoundedRect(rect,8,8)
 
                         rect.adjust(adjust, 0, -adjust, 0)
                         painter.setPen(QtCore.Qt.black)

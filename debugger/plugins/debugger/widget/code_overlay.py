@@ -76,66 +76,42 @@ class CodeOverlay(QtGui.QWidget):
         """ Paint the timings
         """
 
-        painter = QtGui.QPainter(self)
-
-        cw = self.parent()
-
-        document = cw.document()
-        text_font = document.defaultFont()
-        textFontMetrics = QtGui.QFontMetrics(text_font)
-
-        msg_font = self._font
-        msgFontMetrics = QtGui.QFontMetrics(msg_font)
-        leading = msgFontMetrics.leading()
-        painter.setFont(msg_font)
-
-        offset = cw.contentOffset()
-
-        block = cw.firstVisibleBlock()
-        geometry = cw.blockBoundingGeometry(block).translated(offset)
-        top = geometry.top()
-        bottom = top + geometry.height()
-
-        right_margin = 20
-
-        template = '%7s %12s %8s %8s'
-
-        timing_bg = QtGui.QColor(227, 229, 235)
-        painter.setPen(timing_bg)
-        painter.setBrush(timing_bg)
-
-        animate = self._animate
-
         if self._timings:
-            # Print a header at the top
-            header = template % ('Hits', 'Time', 'Per Hit', '% Time')
-            adjust = 10
-            orig_width = width = msgFontMetrics.width(header) + adjust*2
-            if animate:
-                width *= animate
-            rect = QtCore.QRectF(geometry).adjusted(0, 2,-right_margin, -1)
-            if animate:
-                left = (rect.right()-orig_width)*(animate) + (adjust)*(1-animate)
-            else:
-                left = rect.right() - width
-            rect.setWidth(width)
-            rect.moveLeft(left)
-            painter.drawRoundedRect(rect,8,8)
-            rect.adjust(adjust, 0, -adjust, 0)
-            painter.setPen(QtCore.Qt.black)
-            painter.drawText(rect,
-                QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter,
-                template % ('Hits', 'Time', 'Per Hit', '% Time'))
+            painter = QtGui.QPainter(self)
 
+            cw = self.parent()
+
+            document = cw.document()
+            text_font = document.defaultFont()
+            textFontMetrics = QtGui.QFontMetrics(text_font)
+
+            msg_font = self._font
+            msgFontMetrics = QtGui.QFontMetrics(msg_font)
+            leading = msgFontMetrics.leading()
+            painter.setFont(msg_font)
+
+            offset = cw.contentOffset()
+            right_margin = 20
+
+            animate = self._animate
+
+            timing_bg = QtGui.QColor(227, 229, 235)
             line_pen = QtGui.QPen(timing_bg, 2, QtCore.Qt.DotLine)
 
             # Skip the first block
-
+            block = cw.firstVisibleBlock()
             block = block.next()
             geometry = cw.blockBoundingGeometry(block).translated(offset)
             top = geometry.top()
             bottom = top + geometry.height()
 
+
+            template = '%7s %12s %8s %8s'
+            header = template % ('Hits', 'Time', 'Per Hit', '% Time')
+            adjust = 10
+            orig_width = width = msgFontMetrics.width(header) + adjust*2
+
+            timings_shown = False
             while block.isValid() and top <= event.rect().bottom():
                 if block.isVisible() and bottom >= event.rect().top():
                     blockNum = block.blockNumber() + 1
@@ -143,6 +119,7 @@ class CodeOverlay(QtGui.QWidget):
                     rect = QtCore.QRectF(geometry).adjusted(0,0,-right_margin, 0)
                     timings = self._timings.get(blockNum)
                     if timings:
+                        timings_shown = True
 
                         txt_width = textFontMetrics.width(block.text())
 
@@ -176,3 +153,29 @@ class CodeOverlay(QtGui.QWidget):
                 top = geometry.top()
                 bottom = top + geometry.height()
 
+            # Print a header at the top if we printed any timings
+            if timings_shown:
+                block = cw.firstVisibleBlock()
+                geometry = cw.blockBoundingGeometry(block).translated(offset)
+                top = geometry.top()
+                bottom = top + geometry.height()
+
+                if animate:
+                    width *= animate
+                rect = QtCore.QRectF(geometry).adjusted(0, 2,-right_margin, -1)
+                if animate:
+                    left = (rect.right()-orig_width)*(animate) + (adjust)*(1-animate)
+                else:
+                    left = rect.right() - width
+                rect.setWidth(width)
+                rect.moveLeft(left)
+
+                painter.setPen(timing_bg)
+                painter.setBrush(timing_bg)
+                painter.drawRoundedRect(rect,8,8)
+
+                rect.adjust(adjust, 0, -adjust, 0)
+                painter.setPen(QtCore.Qt.black)
+                painter.drawText(rect,
+                    QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter,
+                    header)

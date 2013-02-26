@@ -26,19 +26,18 @@ class CodeOverlay(QtGui.QWidget):
 
         self._timings = {}
         self._animate = 0
-        self._a = None
+        self._a = QtCore.QPropertyAnimation(self, 'animate', self)
 
     def setTimings(self, timings):
         if timings:
             self._timings = timings
             self.showTimings()
         else:
-            self.hideTimings(timings)
+            self.hideTimings()
 
     def showTimings(self):
-        if self._a: self._a.stop()
-
-        self._a = anim = QtCore.QPropertyAnimation(self, 'animate', self)
+        anim = self._a
+        anim.stop()
         anim.setDuration(400)
         anim.setStartValue(0.01)
         anim.setEndValue(1)
@@ -46,17 +45,16 @@ class CodeOverlay(QtGui.QWidget):
         anim.setEasingCurve(QtCore.QEasingCurve.OutQuad)
         anim.start()
 
-    def hideTimings(self, timings):
-        if self._a: self._a.stop()
-
-        self._a = anim = QtCore.QPropertyAnimation(self, 'animate', self)
+    def hideTimings(self):
+        anim = self._a
+        anim.stop()
         anim.setDuration(400)
         anim.setStartValue(1)
         anim.setEndValue(0.0)
 
         anim.setEasingCurve(QtCore.QEasingCurve.OutQuad)
         anim.start()
-        anim.finished.connect(lambda: setattr(self, '_timings', timings))
+        anim.finished.connect(lambda: setattr(self, '_timings', []))
 
     def set_animate(self, val):
         self._animate = val

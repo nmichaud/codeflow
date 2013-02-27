@@ -517,7 +517,6 @@ class Thread(object):
         self.trace_func_stack = []
         self.reported_process_loaded = False
         self.django_stepping = None
-        self.collect_timings = set()
         if sys.platform == 'cli':
             self.frames = []
     
@@ -559,16 +558,6 @@ class Thread(object):
     
     def handle_call(self, frame, arg):
         self.push_frame(frame)
-
-        if TIMING_POINTS:
-            tp = TIMING_POINTS.get(frame.f_lineno)
-            if tp is not None:
-                for (filename, tp_id), bound in tp.items():
-                    if filename == frame.f_code.co_filename or (not bound and filename_is_same(filename, frame.f_code.co_filename)):
-                        # Start collecting timing data
-                        LINE_PROFILER.add_func_code(frame.f_code)
-                        self.collect_timings.add(frame.f_code)
-                        break
 
         if DJANGO_BREAKPOINTS:
             source_obj = get_django_frame_source(frame)
@@ -629,6 +618,7 @@ class Thread(object):
             # work around IronPython bug - http://ironpython.codeplex.com/workitem/30127
             self.handle_line(frame, arg)
 
+
         # forward call to previous trace function, if any, saving old trace func for when we return
         old_trace_func = self.prev_trace_func
         if old_trace_func is not None:
@@ -636,8 +626,19 @@ class Thread(object):
             self.prev_trace_func = None  # clear first incase old_trace_func stack overflows
             self.prev_trace_func = old_trace_func(frame, 'call', arg)
 
+        # If we would like to time this function, return the line_profiler
+        # trace function
+        if TIMING_POINTS:
+            tp = TIMING_POINTS.get(frame.f_lineno)
+            if tp is not None:
+                for (filename, tp_id), bound in tp.items():
+                    if filename == frame.f_code.co_filename or (not bound and filename_is_same(filename, frame.f_code.co_filename)):
+                        # Start collecting timing data
+                        LINE_PROFILER.add_func_code(frame.f_code)
+                        return LINE_PROFILER.pytrace_wrapper
+
         return self.trace_func
-        
+
     def handle_line(self, frame, arg):
         if not DETACHED:
             stepping = self.stepping
@@ -682,10 +683,6 @@ class Thread(object):
                                 self.block(lambda: (report_breakpoint_hit(bp_id, self.id), mark_all_threads_for_break()))
                             break
 
-        if frame.f_code in self.collect_timings:
-            # Call into line_profiler
-            _line_profiler._line_trace(LINE_PROFILER, frame)
-
         # forward call to previous trace function, if any, updating trace function appropriately
         old_trace_func = self.prev_trace_func
         if old_trace_func is not None:
@@ -716,9 +713,6 @@ class Thread(object):
                         self.stepping = STEPPING_NONE
                         update_all_thread_stacks(self)
                         self.block(lambda: report_step_finished(self.id))
-            if frame.f_code in self.collect_timings:
-                _line_profiler._return_trace(LINE_PROFILER, frame)
-                self.collect_timings.remove(frame.f_code)
 
         # forward call to previous trace function, if any
         old_trace_func = self.prev_trace_func

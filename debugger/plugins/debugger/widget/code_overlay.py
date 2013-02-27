@@ -130,7 +130,7 @@ class CodeOverlay(QtGui.QWidget):
 
                         rect = QtCore.QRectF(geometry).intersected(bounds).adjusted(0,2,-right_margin, -1)
                         if animate:
-                            left = (rect.right()-orig_width)*(animate) + (txt_width+adjust)*(1-animate)
+                            left = (rect.right()-orig_width)*(animate) + (adjust)*(1-animate)
                         else:
                             left = rect.right() - width
                         rect.setWidth(width)
@@ -138,9 +138,10 @@ class CodeOverlay(QtGui.QWidget):
                         nhits, time, per_hit, percent = timings
 
                         # Draw a line back to the text
-                        painter.setPen(line_pen)
-                        y = rect.center().y()
-                        painter.drawLine(txt_width + adjust, y, rect.left(), y)
+                        if left > txt_width:
+                            painter.setPen(line_pen)
+                            y = rect.center().y()
+                            painter.drawLine(txt_width + adjust, y, rect.left(), y)
                         # Draw rect
                         color = self.calc_color(percent*0.01)
                         painter.setPen(color)

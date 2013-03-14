@@ -25,6 +25,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
     breakpointHit = Event()
     breakpointBindSucceeded = Event()
     breakpointBindFailed = Event()
+    profileStats = Event()
     setLineNoComplete = Event()
     debuggerOutput = Event()
     threadFrameList = Event()
@@ -365,6 +366,38 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             frames.append((flineno,lineno,curlineno,framename,filename,argcount,vars))
         assert(len(bytes) == 0)
         self.threadFrameList = (thread_id, tname, frames)
+
+    def receive_CPRF(self, bytes):
+        """ CProfile stats
+
+        Data format:
+        ------------
+            num functions: int
+            Functions:
+                filename: string
+                start_lineno: int
+                function name: string
+                ncalls before '/': int
+                ncalls after '/': int
+                tottime: float
+                cumtime: float
+                Subcalls:
+                    Empty for now
+
+        """
+        stats = []
+        fcount, = struct.unpack('!I', bytes[:4])
+        bytes = bytes[4:]
+        for f_i in range(fcount):
+            filename, bytes = self._read_string(bytes)
+            start_lineno, = struct.unpack('!I', bytes[:4])
+            func_name, bytes = self._read_string(bytes[4:])
+            ncalls, ncalls_after, tottime, cumtime, nsubcalls = struct.unpack('!IIffI', bytes[:20])
+            bytes = bytes[20:]
+            stats.append((filename, start_lineno, func_name, 
+                          ncalls, ncalls_after, tottime, cumtime, nsubcalls))
+        assert(len(bytes) == 0)
+        self.profileStats = stats
 
     def receive_DETC(self, bytes):
         """ Detach message (process exited)

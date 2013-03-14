@@ -211,6 +211,7 @@ EXCR = cmd('EXCR')
 CHLD = cmd('CHLD')
 OUTP = cmd('OUTP')
 REQH = cmd('REQH')
+CPRF = cmd('CPRF')
 UNICODE_PREFIX = cmd('U')
 ASCII_PREFIX = cmd('A')
 NONE_PREFIX = cmd('N')
@@ -1579,7 +1580,19 @@ def report_profiling():
                     tt += prev[2]
                     ct += prev[3]
                 callers[func] = nc, cc, tt, ct
-    print stats
+
+    with _SendLockCtx, _NetstringConn as conn:
+        conn.send(CPRF)
+        conn.send(struct.pack('!I', len(stats)))
+        for (filename, start_lineno, name), (cc, nc, tt, ct, callers) in stats.items():
+            write_string(conn, filename)
+            conn.send(struct.pack('!I', start_lineno))
+            write_string(conn, name)
+            conn.send(struct.pack('!IIffI', cc, nc, tt, ct, len(callers)))
+            #for lineno, nhits, time in callers:
+            #    conn.send(struct.pack('!I', lineno))
+            #    conn.send(struct.pack('!I', nhits))
+            #    conn.send(struct.pack('!f', time))
 
 def report_exception(frame, exc_info, tid, break_type):
     exc_type = exc_info[0]

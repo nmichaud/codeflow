@@ -24,6 +24,7 @@ class PythonProcess(HasStrictTraits):
     readyToDebug = Bool(False)
 
     moduleLoaded = Event()
+    profileStats = Event()
     completedDebugging = Event()
 
     @on_trait_change('protocol:processLoaded')
@@ -74,6 +75,10 @@ class PythonProcess(HasStrictTraits):
     @on_trait_change('protocol:moduleLoaded')
     def module_loaded(self, (module_id, filename)):
         self.moduleLoaded = filename
+
+    @on_trait_change('protocol:profileStats')
+    def profile_stats(self, stats):
+        self.profileStats = stats
 
     #_lineEvent
     #_ids = Instance(IdDispenser)

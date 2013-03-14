@@ -252,6 +252,10 @@ class DebuggerTask(Task):
                     bp = self.debug_process.AddBreakPoint(filename, breakpoint, '')
                     bp.Add()
 
+    @on_trait_change('debug_process:profileStats')
+    def profile_stats(self, stats):
+        pass
+
     @on_trait_change('active_editor:breakpoints')
     def added_breakpoint(self, name, event):
         if self.debug_process:

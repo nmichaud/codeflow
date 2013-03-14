@@ -120,7 +120,7 @@ class _NetstringWrapper(object):
             _c = conn
         if exc_type is None and self._data:
             data, self._data = ''.join(self._data), []
-            _c.send(struct.pack('i', len(data)))
+            _c.send(struct.pack('!I', len(data)))
             _c.send(data)
         return False
 
@@ -763,7 +763,7 @@ class Thread(object):
                     SEND_BREAK_COMPLETE = False
                     sent_break_complete = True
                     conn.send(ASBR)
-                    conn.send(struct.pack('l', self.id))
+                    conn.send(struct.pack('!Q', self.id))
 
             if sent_break_complete:
                 # if we have threads which have not broken yet capture their frame list and 
@@ -1081,27 +1081,27 @@ class Thread(object):
     def send_frame_list(self, frames, thread_name = None):
         with _SendLockCtx, _NetstringConn as conn:
             conn.send(THRF)
-            conn.send(struct.pack('l',self.id))
+            conn.send(struct.pack('!Q',self.id))
             write_string(conn,thread_name)
         
             # send the frame count
-            conn.send(struct.pack('i', len(frames)))
+            conn.send(struct.pack('!I', len(frames)))
             for firstlineno, lineno, curlineno, name, filename, argcount, variables, frameKind, sourceFile, sourceLine in frames:
                 # send each frame    
-                conn.send(struct.pack('i', firstlineno))
-                conn.send(struct.pack('i', lineno))
-                conn.send(struct.pack('i', curlineno))
+                conn.send(struct.pack('!I', firstlineno))
+                conn.send(struct.pack('!I', lineno))
+                conn.send(struct.pack('!I', curlineno))
         
                 write_string(conn,name)
                 write_string(conn,filename)
-                conn.send(struct.pack('i', argcount))
+                conn.send(struct.pack('!I', argcount))
                 
-                #conn.send(struct.pack('i', frameKind))
+                #conn.send(struct.pack('!I', frameKind))
                 #if frameKind == FRAME_KIND_DJANGO:
                 #    write_string(conn,sourceFile)
-                #    conn.send(struct.pack('i', sourceLine))
+                #    conn.send(struct.pack('!I', sourceLine))
                 
-                conn.send(struct.pack('i', len(variables)))
+                conn.send(struct.pack('!I', len(variables)))
                 for name, type_obj, safe_repr_obj, hex_repr_obj, type_name, obj_len in variables:
                     write_string(conn,name)
                     
@@ -1252,11 +1252,11 @@ class DebuggerLoop(object):
             self.command_resume_all()
 
     def command_set_breakpoint(self):
-        brkpt_id = read_int(self.conn)
-        lineNo = read_int(self.conn)
+        brkpt_id = read_uint(self.conn)
+        lineNo = read_uint(self.conn)
         filename = read_string(self.conn)
         condition = read_string(self.conn)
-        break_when_changed = read_int(self.conn)
+        break_when_changed = read_uint(self.conn)
                                 
         for modFilename, module in MODULES:
             if check_break_point(modFilename, module, brkpt_id, lineNo, filename, condition, break_when_changed):
@@ -1268,9 +1268,9 @@ class DebuggerLoop(object):
             report_breakpoint_failed(brkpt_id)
 
     def command_set_breakpoint_condition(self):
-        brkpt_id = read_int(self.conn)
+        brkpt_id = read_uint(self.conn)
         condition = read_string(self.conn)
-        break_when_changed = read_int(self.conn)
+        break_when_changed = read_uint(self.conn)
         
         for line, bp_dict in BREAKPOINTS.items():
             for filename, id in bp_dict:
@@ -1279,8 +1279,8 @@ class DebuggerLoop(object):
                     break
 
     def command_remove_breakpoint(self):
-        lineNo = read_int(self.conn)
-        brkpt_id = read_int(self.conn)
+        lineNo = read_uint(self.conn)
+        brkpt_id = read_uint(self.conn)
         cur_bp = BREAKPOINTS.get(lineNo)
         if cur_bp is not None:
             for file, id in cur_bp:
@@ -1291,8 +1291,8 @@ class DebuggerLoop(object):
                     break
 
     def command_remove_django_breakpoint(self):
-        lineNo = read_int(self.conn)
-        brkpt_id = read_int(self.conn)
+        lineNo = read_uint(self.conn)
+        brkpt_id = read_uint(self.conn)
         filename = read_string(self.conn)
 
         bp_info = DJANGO_BREAKPOINTS.get(filename.lower())
@@ -1300,8 +1300,8 @@ class DebuggerLoop(object):
             bp_info.remove_breakpoint(lineNo)
 
     def command_add_django_breakpoint(self):
-        brkpt_id = read_int(self.conn)
-        lineNo = read_int(self.conn)
+        brkpt_id = read_uint(self.conn)
+        lineNo = read_uint(self.conn)
         filename = read_string(self.conn)
         bp_info = DJANGO_BREAKPOINTS.get(filename.lower())
         if bp_info is None:
@@ -1310,7 +1310,7 @@ class DebuggerLoop(object):
         bp_info.add_breakpoint(lineNo, brkpt_id)
 
     def command_connect_repl(self):
-        port_num = read_int(self.conn)
+        port_num = read_uint(self.conn)
         _start_new_thread(self.connect_to_repl_backend, (port_num,))
 
     def connect_to_repl_backend(self, port_num):
@@ -1355,11 +1355,11 @@ class DebuggerLoop(object):
     
     def command_set_exception_info(self):
         BREAK_ON.Clear()
-        BREAK_ON.default_mode = read_int(self.conn)
+        BREAK_ON.default_mode = read_uint(self.conn)
 
-        break_on_count = read_int(self.conn)
+        break_on_count = read_uint(self.conn)
         for i in xrange(break_on_count):
-            mode = read_int(self.conn)
+            mode = read_uint(self.conn)
             name = read_string(self.conn)
             BREAK_ON.AddException(name, mode)
 
@@ -1367,10 +1367,10 @@ class DebuggerLoop(object):
         try:
             filename = read_string(self.conn)
 
-            statement_count = read_int(self.conn)
+            statement_count = read_uint(self.conn)
             handlers = []
             for _ in xrange(statement_count):
-                line_start, line_end = read_int(self.conn), read_int(self.conn)
+                line_start, line_end = read_int(self.conn), read_uint(self.conn)
 
                 if line_start == -1:
                     line_start = None
@@ -1399,8 +1399,8 @@ class DebuggerLoop(object):
 
     def command_set_lineno(self):
         tid = read_long(self.conn)
-        fid = read_int(self.conn)
-        lineno = read_int(self.conn)
+        fid = read_uint(self.conn)
+        lineno = read_uint(self.conn)
         try:
             THREADS_LOCK.acquire()
             THREADS[tid].cur_frame.f_lineno = lineno
@@ -1408,23 +1408,23 @@ class DebuggerLoop(object):
             THREADS_LOCK.release()
             with _SendLockCtx, _NetstringWrapper(self.conn) as conn:
                 conn.send(SETL)
-                conn.send(struct.pack('i', 1))
-                conn.send(struct.pack('l', tid))
-                conn.send(struct.pack('i', newline))
+                conn.send(struct.pack('!I', 1))
+                conn.send(struct.pack('!Q', tid))
+                conn.send(struct.pack('!I', newline))
         except:
             with _SendLockCtx, _NetstringWrapper(self.conn) as conn:
                 conn.send(SETL)
-                conn.send(struct.pack('i', 0))
-                conn.send(struct.pack('l', tid))
-                conn.send(struct.pack('i', 0))
+                conn.send(struct.pack('!I', 0))
+                conn.send(struct.pack('!Q', tid))
+                conn.send(struct.pack('!I', 0))
 
     def command_execute_code(self):
         # execute given text in specified frame
         text = read_string(self.conn)
         tid = read_long(self.conn) # thread id
-        fid = read_int(self.conn) # frame id
-        eid = read_int(self.conn) # execution id
-        frame_kind = read_int(self.conn)
+        fid = read_uint(self.conn) # frame id
+        eid = read_uint(self.conn) # execution id
+        frame_kind = read_uint(self.conn)
 
         thread, cur_frame = self.get_thread_and_frame(tid, fid, frame_kind)
         if thread is not None and cur_frame is not None:
@@ -1440,10 +1440,10 @@ class DebuggerLoop(object):
         # execute given text in specified frame
         text = read_string(self.conn)
         tid = read_long(self.conn) # thread id
-        fid = read_int(self.conn) # frame id
-        eid = read_int(self.conn) # execution id
-        frame_kind = read_int(self.conn) # frame kind
-        child_is_enumerate = read_int(self.conn)
+        fid = read_uint(self.conn) # frame id
+        eid = read_uint(self.conn) # execution id
+        frame_kind = read_uint(self.conn) # frame kind
+        child_is_enumerate = read_uint(self.conn)
                 
         thread, cur_frame = self.get_thread_and_frame(tid, fid, frame_kind)
         if thread is not None and cur_frame is not None:
@@ -1504,15 +1504,15 @@ def write_string(conn,string):
     elif isinstance(string, unicode):
         bytes = string.encode('utf8')
         conn.send(UNICODE_PREFIX)
-        conn.send(struct.pack('i', len(bytes)))
+        conn.send(struct.pack('!I', len(bytes)))
         conn.send(bytes)
     else:
         conn.send(ASCII_PREFIX)
-        conn.send(struct.pack('i', len(string)))
+        conn.send(struct.pack('!I', len(string)))
         conn.send(string)
 
 def read_string(conn):
-    str_len = read_int(conn)
+    str_len = read_uint(conn)
     if not str_len:
         return ''
     res = cmd('')
@@ -1521,22 +1521,25 @@ def read_string(conn):
     return res.decode('utf8')
 
 def read_int(conn):
-    return struct.unpack('i', conn.recv(4))[0]
+    return struct.unpack('!i', conn.recv(4))[0]
+
+def read_uint(conn):
+    return struct.unpack('!I', conn.recv(4))[0]
 
 def read_long(conn):
-    return struct.unpack('l', conn.recv(8))[0]
+    return struct.unpack('!Q', conn.recv(8))[0]
 
 def report_new_thread(new_thread):
     ident = new_thread.id
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(NEWT)
-        conn.send(struct.pack('l', ident))
+        conn.send(struct.pack('!Q', ident))
 
 def report_thread_exit(old_thread):
     ident = old_thread.id
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(EXTT)
-        conn.send(struct.pack('l', ident))
+        conn.send(struct.pack('!Q', ident))
 
 def report_exception(frame, exc_info, tid, break_type):
     exc_type = exc_info[0]
@@ -1554,8 +1557,8 @@ def report_exception(frame, exc_info, tid, break_type):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(EXCP)
         write_string(conn,exc_name)
-        conn.send(struct.pack('l', tid))
-        conn.send(struct.pack('i', break_type))
+        conn.send(struct.pack('!Q', tid))
+        conn.send(struct.pack('!I', break_type))
         write_string(conn,excp_text)
 
 def new_module(frame):
@@ -1567,39 +1570,39 @@ def new_module(frame):
 def report_module_load(mod):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(MODL)
-        conn.send(struct.pack('l', mod.module_id))
+        conn.send(struct.pack('!Q', mod.module_id))
         write_string(conn,mod.filename)
 
 def report_step_finished(tid):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(STPD)
-        conn.send(struct.pack('l', tid))
+        conn.send(struct.pack('!Q', tid))
 
 def report_breakpoint_bound(id):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(BRKS)
-        conn.send(struct.pack('i', id))
+        conn.send(struct.pack('!I', id))
 
 def report_breakpoint_failed(id):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(BRKF)
-        conn.send(struct.pack('i', id))
+        conn.send(struct.pack('!I', id))
 
 def report_breakpoint_hit(id, tid):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(BRKH)
-        conn.send(struct.pack('i', id))
-        conn.send(struct.pack('l', tid))
+        conn.send(struct.pack('!I', id))
+        conn.send(struct.pack('!Q', tid))
 
 def report_process_loaded(tid):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(LOAD)
-        conn.send(struct.pack('l', tid))
+        conn.send(struct.pack('!Q', tid))
 
 def report_execution_error(exc_text, execution_id):
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(EXCE)
-        conn.send(struct.pack('i', execution_id))
+        conn.send(struct.pack('!I', execution_id))
         write_string(conn,exc_text)
 
 def report_execution_exception(execution_id, exc_info):
@@ -1637,7 +1640,7 @@ def report_execution_result(execution_id, result):
 
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(EXCR)
-        conn.send(struct.pack('i', execution_id))
+        conn.send(struct.pack('!I', execution_id))
         write_object(conn,res_type, obj_repr, hex_repr, type_name, obj_len)
 
 def report_children(execution_id, attributes, indices, indices_are_index, indices_are_enumerate):
@@ -1646,11 +1649,11 @@ def report_children(execution_id, attributes, indices, indices_are_index, indice
 
     with _SendLockCtx, _NetstringConn as conn:
         conn.send(CHLD)
-        conn.send(struct.pack('i', execution_id))
-        conn.send(struct.pack('i', len(attributes)))
-        conn.send(struct.pack('i', len(indices)))
-        conn.send(struct.pack('i', indices_are_index))
-        conn.send(struct.pack('i', indices_are_enumerate))
+        conn.send(struct.pack('!I', execution_id))
+        conn.send(struct.pack('!I', len(attributes)))
+        conn.send(struct.pack('!I', len(indices)))
+        conn.send(struct.pack('!I', indices_are_index))
+        conn.send(struct.pack('!I', indices_are_enumerate))
         for child_name, obj_repr, hex_repr, res_type, type_name, obj_len in attributes:
             write_string(conn,child_name)
             write_object(conn,res_type, obj_repr, hex_repr, type_name, obj_len)
@@ -1671,9 +1674,9 @@ def write_object(conn,obj_type, obj_repr, hex_repr, type_name, obj_len):
     write_string(conn,hex_repr)
     write_string(conn,type_name)
     if obj_type in NONEXPANDABLE_TYPES or obj_len == 0:
-        conn.send(struct.pack('i', 0))
+        conn.send(struct.pack('!I', 0))
     else:
-        conn.send(struct.pack('i', 1))
+        conn.send(struct.pack('!I', 1))
 
 
 try:
@@ -1713,7 +1716,7 @@ def attach_process(port_num, debug_id, report_and_block = False):
             with _NetstringConn as con:
                 con.send(CONN)
                 write_string(con,debug_id)
-                con.send(struct.pack('i', 0))  # success
+                con.send(struct.pack('!I', 0))  # success
             break
         except:
             import time
@@ -1850,7 +1853,7 @@ class _DebuggerOutput(object):
             probe_stack(3)
             with _SendLockCtx, _NetstringConn as conn:
                 conn.send(OUTP)
-                conn.send(struct.pack('l', thread.get_ident()))
+                conn.send(struct.pack('!Q', thread.get_ident()))
                 write_string(conn,value)
         if self.old_out:
             self.old_out.write(value)
@@ -1878,7 +1881,7 @@ class DebuggerBuffer(object):
             str_data = data.decode('utf8')
             with _SendLockCtx, _NetstringConn as conn:
                 conn.send(OUTP)
-                conn.send(struct.pack('l', thread.get_ident()))
+                conn.send(struct.pack('!Q', thread.get_ident()))
                 write_string(conn,str_data)
         self.buffer.write(data)
 

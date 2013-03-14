@@ -29,7 +29,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
     debuggerOutput = Event()
     threadFrameList = Event()
 
-    structFormat = "I"
+    structFormat = "!I"
     prefixLength = struct.calcsize(structFormat)
 
     def __init__(self, factory):
@@ -57,7 +57,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         self.transport.write('stpi')
-        self.transport.write(struct.pack('l', thread_id))
+        self.transport.write(struct.pack('!Q', thread_id))
 
     def send_STPO(self, thread_id):
         """ Step out command
@@ -67,7 +67,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         self.transport.write('stpo')
-        self.transport.write(struct.pack('l', thread_id))
+        self.transport.write(struct.pack('!Q', thread_id))
 
     def send_STPV(self, thread_id):
         """ Step over command
@@ -77,7 +77,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         self.transport.write('stpv')
-        self.transport.write(struct.pack('l', thread_id))
+        self.transport.write(struct.pack('!Q', thread_id))
 
     def send_BRKP(self, brkpt_id, line_no, filename, condition, break_when_changed):
         """ Set breakpoint command
@@ -91,10 +91,10 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             break_when_changed: int
         """
         self.transport.write('brkp')
-        self.transport.write(struct.pack('ii', brkpt_id, line_no))
+        self.transport.write(struct.pack('!II', brkpt_id, line_no))
         self._write_string(filename)
         self._write_string(condition)
-        self.transport.write(struct.pack('i', 1 if break_when_changed else 0))
+        self.transport.write(struct.pack('!I', 1 if break_when_changed else 0))
 
     def send_BRKC(self, brkpt_id, condition, break_when_changed):
         """ Set breakpoint with condition
@@ -106,9 +106,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
         """
         self.transport.write('brkc')
-        self.transport.write(struct.pack('i', brkpt_id))
+        self.transport.write(struct.pack('!I', brkpt_id))
         self._write_string(condition)
-        self.transport.write(struct.pack('i', 1 if break_when_changed else 0))
+        self.transport.write(struct.pack('!I', 1 if break_when_changed else 0))
 
     def send_BRKR(self, brkpt_id, line_no):
         """ Remove breakpoint command
@@ -119,7 +119,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             line number: int
         """
         self.transport.write('brkr')
-        self.transport.write(struct.pack('ii', line_no, brkpt_id))
+        self.transport.write(struct.pack('!II', line_no, brkpt_id))
 
     def send_BRKA(self):
         """ Break all command
@@ -145,7 +145,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         self.transport.write('rest')
-        self.transport.write(struct.pack('l', thread_id))
+        self.transport.write(struct.pack('!Q', thread_id))
 
     def send_EXEC(self, code, thread_id, frame_id, execution_id):
         """ Execute code command
@@ -160,7 +160,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         self.transport.write('exec')
         self._write_string(code)
-        self.transport.write(struct.pack('liii', thread_id, frame_id, execution_id, 1))
+        self.transport.write(struct.pack('!QIII', thread_id, frame_id, execution_id, 1))
 
     def send_CHLD(self, code, thread_id, frame_id, execution_id, child_is_enumerate):
         """ Enumerate children in given frame
@@ -176,7 +176,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         """
         self.transport.write('chld')
         self._write_string(code)
-        self.transport.write(struct.pack('liiii', thread_id, frame_id, execution_id, 1, 1 if child_is_enumerate else 0))
+        self.transport.write(struct.pack('!QIIII', thread_id, frame_id, execution_id, 1, 1 if child_is_enumerate else 0))
 
     def send_SETL(self, thread_id, frame_id, line_number):
         """ Set line number command
@@ -188,7 +188,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             line number: int
         """
         self.transport.write('setl')
-        self.transport.write(struct.pack('lii', thread_id, frame_id, line_number))
+        self.transport.write(struct.pack('!QII', thread_id, frame_id, line_number))
 
     def send_DETC(self):
         """  Detach command
@@ -206,7 +206,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
         """
         self.transport.write('clst')
-        self.transport.write(struct.pack('l', thread_id))
+        self.transport.write(struct.pack('!Q', thread_id))
 
     def send_SEXI(self, exception_mode, exceptions):
         """ Set exception info command
@@ -220,9 +220,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                 name: string
         """
         self.transport.write('sexi')
-        self.transport.write(struct.pack('ii', exception_mode, len(exceptions)))
+        self.transport.write(struct.pack('!II', exception_mode, len(exceptions)))
         for excp in exceptions:
-            self.transport.write(struct.pack('i', excp.mode))
+            self.transport.write(struct.pack('!I', excp.mode))
             self._write_string(excp.name)
 
     def send_SEHI(self, filename, statements):
@@ -240,9 +240,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         # XXX The statement text format has to be worked out
         self.transport.write('sehi')
         self._write_string(filename)
-        self.transport.write(struct.pack('i', len(statements)))
+        self.transport.write(struct.pack('!I', len(statements)))
         for statement in statements:
-            self.transport.write(struct.pack('ii', statement.start, statement.end))
+            self.transport.write(struct.pack('!II', statement.start, statement.end))
             self._write_string(statement.text)
 
     def send_BKDR(self):
@@ -265,7 +265,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             port: int
         """
         self.transport.write('crep')
-        self.transport.write(struct.pack('i', port))
+        self.transport.write(struct.pack('!I', port))
 
     def send_DREP(self):
         """ Disconnect REPL command
@@ -285,7 +285,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             Success flag: int
         """
         guid, bytes = self._read_string(bytes)
-        flag, = struct.unpack('i', bytes)
+        flag, = struct.unpack('!I', bytes)
 
         self.state = 'debugging'
         self.factory.processConnected(guid, self)
@@ -302,7 +302,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             break id: int
         """
-        brkpt_id, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('!I', bytes)
         self.asyncBreakComplete = brkpt_id
 
     def receive_SETL(self, bytes):
@@ -314,7 +314,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
             newline: int
         """
-        status, thread_id, newline = struct.unpack('ili', bytes)
+        status, thread_id, newline = struct.unpack('!IQI', bytes)
         self.setLineNoComplete = (status, thread_id, newline)
 
     def receive_THRF(self, bytes):
@@ -341,16 +341,16 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                         type name: string
                         expandable: int
         """
-        thread_id, = struct.unpack('l', bytes[:8])
+        thread_id, = struct.unpack('!Q', bytes[:8])
         tname, bytes = self._read_string(bytes[8:])
-        fcount, = struct.unpack('i', bytes[:4])
+        fcount, = struct.unpack('!I', bytes[:4])
         bytes = bytes[4:]
         frames = []
         for f_i in range(fcount):
-            flineno,lineno,curlineno = struct.unpack('iii', bytes[:12])
+            flineno,lineno,curlineno = struct.unpack('!III', bytes[:12])
             framename, bytes = self._read_string(bytes[12:])
             filename, bytes = self._read_string(bytes)
-            argcount, vcount = struct.unpack('ii', bytes[:8])
+            argcount, vcount = struct.unpack('!II', bytes[:8])
             bytes = bytes[8:]
             vars = []
             for v_i in range(vcount):
@@ -377,7 +377,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         -----------
             Thread ID: long
         """
-        thread_id, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('!Q', bytes)
         self.threadCreated = thread_id
 
     def receive_EXTT(self, bytes):
@@ -387,7 +387,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        thread_id, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('!Q', bytes)
         self.threadExited = thread_id
 
     def receive_EXCP(self, bytes):
@@ -401,7 +401,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             exception text: string
         """
         name, bytes = self._read_string(bytes)
-        thread_id, break_type = struct.unpack('li', bytes[:12])
+        thread_id, break_type = struct.unpack('!QI', bytes[:12])
         excp_text, bytes = self._read_string(bytes[12:])
         assert(len(bytes) == 0)
         self.exceptionRaised = (thread_id, name, break_type, excp_text)
@@ -414,7 +414,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             Module id: long
             Module filename: string
         """
-        module_id, = struct.unpack('l', bytes[:8])
+        module_id, = struct.unpack('!Q', bytes[:8])
         filename, bytes = self._read_string(bytes[8:])
         assert(len(bytes) == 0)
         self.moduleLoaded = (module_id, filename)
@@ -426,7 +426,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        thread_id, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('!Q', bytes)
         self.stepComplete = thread_id
 
     def receive_BRKS(self, bytes):
@@ -436,7 +436,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             breakpoint id: int
         """
-        brkpt_id, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('!I', bytes)
         self.breakpointBindSucceeded = brkpt_id
 
     def receive_BRKF(self, bytes):
@@ -446,7 +446,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             breakpoint id: int
         """
-        brkpt_id, = struct.unpack('i', bytes)
+        brkpt_id, = struct.unpack('!I', bytes)
         self.breakpointBindFailed = brkpt_id
 
     def receive_BRKH(self, bytes):
@@ -457,8 +457,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             breakpoint id: int
             thread id: long
         """
-        brkpt_id, = struct.unpack('i', bytes[:4])
-        thread_id, = struct.unpack('l', bytes[4:])
+        brkpt_id, = struct.unpack('!I', bytes[:4])
+        thread_id, = struct.unpack('!Q', bytes[4:])
         self.breakpointHit = (thread_id, brkpt_id)
 
     def receive_LOAD(self, bytes):
@@ -468,7 +468,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         ------------
             thread id: long
         """
-        thread_id, = struct.unpack('l', bytes)
+        thread_id, = struct.unpack('!Q', bytes)
         self.processLoaded = (thread_id,)
 
     def receive_EXCE(self, bytes):
@@ -479,7 +479,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             execution id: int
             exception text: string
         """
-        eid, = struct.unpack('i', bytes[:4])
+        eid, = struct.unpack('!I', bytes[:4])
         string, bytes = self._read_string(bytes[4:])
         assert(len(bytes) == 0)
 
@@ -491,7 +491,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             execution id: int
             result: object
         """
-        eid, = struct.unpack('i', bytes[:4])
+        eid, = struct.unpack('!I', bytes[:4])
         obj, bytes = self._read_object(bytes[4:])
         assert(len(bytes) == 0)
 
@@ -512,7 +512,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                 name: string
                 object:
         """
-        eid, nattr, nidx, idx_are_index, idx_are_enum = struct.unpack('iiiii', bytes[:20])
+        eid, nattr, nidx, idx_are_index, idx_are_enum = struct.unpack('!IIIII', bytes[:20])
         bytes = bytes[20:]
         for attr in range(nattr):
             name, bytes = self._read_string(bytes)
@@ -531,7 +531,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             thread id: long
             output: string
         """
-        thread_id, = struct.unpack('l', bytes[:8])
+        thread_id, = struct.unpack('!Q', bytes[:8])
         output, bytes = self._read_string(bytes[8:])
         assert(len(bytes) == 0)
         self.debuggerOutput = (thread_id, output)
@@ -564,7 +564,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         if code == 'N':
             return '', bytes[1:]
         else:
-            size, = struct.unpack('i', bytes[1:5])
+            size, = struct.unpack('!I', bytes[1:5])
             string = bytes[5:5+size]
             if code == 'U':
                 string = string.decode('utf8')
@@ -577,7 +577,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         varrepr, bytes = self._read_string(bytes)
         varhex, bytes = self._read_string(bytes)
         vartype, bytes = self._read_string(bytes)
-        varexp, = struct.unpack('i', bytes[:4])
+        varexp, = struct.unpack('!I', bytes[:4])
         bytes = bytes[4:]
         return (varrepr, varhex, vartype, varexp), bytes
 

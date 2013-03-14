@@ -1589,10 +1589,11 @@ def report_profiling():
             conn.send(struct.pack('!I', start_lineno))
             write_string(conn, name)
             conn.send(struct.pack('!IIffI', cc, nc, tt, ct, len(callers)))
-            #for lineno, nhits, time in callers:
-            #    conn.send(struct.pack('!I', lineno))
-            #    conn.send(struct.pack('!I', nhits))
-            #    conn.send(struct.pack('!f', time))
+            for (filename, start_lineno, name), (nc, cc, tt, ct) in callers.items():
+                write_string(conn, filename)
+                conn.send(struct.pack('!I', start_lineno))
+                write_string(conn, name)
+                conn.send(struct.pack('!IIff', nc, cc, tt, ct))
 
 def report_exception(frame, exc_info, tid, break_type):
     exc_type = exc_info[0]

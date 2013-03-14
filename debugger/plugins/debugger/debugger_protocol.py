@@ -382,7 +382,13 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
                 tottime: float
                 cumtime: float
                 Subcalls:
-                    Empty for now
+                    filename: string
+                    start_lineno: int
+                    function name: string
+                    ncalls before '/': int
+                    ncalls after '/': int
+                    tottime: float
+                    cumtime: float
 
         """
         stats = []
@@ -392,10 +398,19 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
             filename, bytes = self._read_string(bytes)
             start_lineno, = struct.unpack('!I', bytes[:4])
             func_name, bytes = self._read_string(bytes[4:])
-            ncalls, ncalls_after, tottime, cumtime, nsubcalls = struct.unpack('!IIffI', bytes[:20])
+            ncalls, ncalls_after, tottime, cumtime, nsubcount = struct.unpack('!IIffI', bytes[:20])
             bytes = bytes[20:]
+            subcalls = []
+            for sc_i in range(nsubcount):
+                sc_fname, bytes = self._read_string(bytes)
+                sc_start_lineno, = struct.unpack('!I', bytes[:4])
+                sc_func_name, bytes = self._read_string(bytes[4:])
+                sc_nc, sc_cc, sc_tt, sc_ct = struct.unpack('!IIff', bytes[:16])
+                bytes = bytes[16:]
+                subcalls.append((sc_fname, sc_start_lineno, sc_func_name, 
+                                 sc_nc, sc_cc, sc_tt, sc_ct))
             stats.append((filename, start_lineno, func_name, 
-                          ncalls, ncalls_after, tottime, cumtime, nsubcalls))
+                          ncalls, ncalls_after, tottime, cumtime, subcalls))
         assert(len(bytes) == 0)
         self.profileStats = stats
 

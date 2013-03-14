@@ -116,6 +116,24 @@ class PythonProcess(HasStrictTraits):
 
         self._process = subprocess.Popen(args)
 
+    def Profile(self, filename):
+        # create process and start it
+        exe = sys.executable
+
+        args = [sys.executable,
+                os.path.join(os.path.dirname(__file__), '..', '..', 'debuggee', 'visualstudio_py_launcher.py'),
+                os.path.dirname(filename),
+                str(self.port),
+                str(self._processGuid),
+                #'--wait-on-exception',
+                #'--wait-on-exit',
+                #'--redirect-output',
+                '--profile',
+                filename,
+                ]
+
+        self._process = subprocess.Popen(args)
+
     def WaitForExit(self):
         return self._process.wait()
 

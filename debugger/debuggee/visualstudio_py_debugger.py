@@ -25,6 +25,8 @@ import weakref
 import traceback
 import types
 import bisect
+import _lsprof
+from cProfile import label
 try:
     import visualstudio_py_repl
 except ImportError:
@@ -1142,6 +1144,8 @@ def get_code(func):
 
 class DebuggerExitException(Exception): pass
 
+CPROFILER = _lsprof.Profiler()
+
 def add_break_point(modFilename, break_when_changed, condition, lineNo, brkpt_id, bound = True):
     cur_bp = BREAKPOINTS.get(lineNo)
     if cur_bp is None:
@@ -1541,6 +1545,42 @@ def report_thread_exit(old_thread):
         conn.send(EXTT)
         conn.send(struct.pack('!Q', ident))
 
+def report_profiling():
+    entries = CPROFILER.getstats()
+    stats = {}
+    callersdicts = {}
+    # call information
+    for entry in entries:
+        func = label(entry.code)
+        nc = entry.callcount         # ncalls column of pstats (before '/')
+        cc = nc - entry.reccallcount # ncalls column of pstats (after '/')
+        tt = entry.inlinetime        # tottime column of pstats
+        ct = entry.totaltime         # cumtime column of pstats
+        callers = {}
+        callersdicts[id(entry.code)] = callers
+        stats[func] = cc, nc, tt, ct, callers
+    # subcall information
+    for entry in entries:
+        if entry.calls:
+            func = label(entry.code)
+            for subentry in entry.calls:
+                try:
+                    callers = callersdicts[id(subentry.code)]
+                except KeyError:
+                    continue
+                nc = subentry.callcount
+                cc = nc - subentry.reccallcount
+                tt = subentry.inlinetime
+                ct = subentry.totaltime
+                if func in callers:
+                    prev = callers[func]
+                    nc += prev[0]
+                    cc += prev[1]
+                    tt += prev[2]
+                    ct += prev[3]
+                callers[func] = nc, cc, tt, ct
+    print stats
+
 def report_exception(frame, exc_info, tid, break_type):
     exc_type = exc_info[0]
     exc_value = exc_info[1]
@@ -1932,7 +1972,7 @@ def silent_excepthook(exc_type, exc_value, exc_tb):
     # Used to avoid displaying the exception twice on exit.
     pass
 
-def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, redirect_output, wait_on_exit, break_on_systemexit_zero = False, debug_stdlib = False, django_debugging = False):
+def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, redirect_output, wait_on_exit, break_on_systemexit_zero = False, debug_stdlib = False, debug_profile = False, django_debugging = False):
     # remove us from modules so there's no trace of us
     sys.modules['$visualstudio_py_debugger'] = sys.modules['visualstudio_py_debugger']
     __name__ = '$visualstudio_py_debugger'
@@ -1944,6 +1984,7 @@ def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, 
     del globals_obj['wait_on_exit']
     del globals_obj['debug_id']
     del globals_obj['django_debugging']
+    del globals_obj['debug_profile']
     if 'break_on_systemexit_zero' in globals_obj: 
         del globals_obj['break_on_systemexit_zero']
     if 'debug_stdlib' in globals_obj: 
@@ -1965,18 +2006,25 @@ def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, 
     cur_thread.stepping = STEPPING_LAUNCH_BREAK
 
     # start tracing on this thread
-    sys.settrace(cur_thread.trace_func)
+    if not debug_profile:
+        sys.settrace(cur_thread.trace_func)
+    else:
+        CPROFILER.enable()
 
     # now execute main file
     try:
         try:
             execfile(file, globals_obj, locals_obj)
         finally:
-            sys.settrace(None)
+            if not debug_profile:
+                sys.settrace(None)
+            else:
+                CPROFILER.disable()
             THREADS_LOCK.acquire()
             if THREADS:
                 del THREADS[cur_thread.id]
             THREADS_LOCK.release()
+            report_profiling()
             report_thread_exit(cur_thread)
 
         if wait_on_exit:

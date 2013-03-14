@@ -35,6 +35,7 @@ redirect_output = False
 wait_on_exit = False
 break_on_systemexit_zero = False
 debug_stdlib = False
+debug_profile = False
 django_debugging = False
 if len(sys.argv) >= 1 and sys.argv[0] == '--wait-on-exception':
     wait_on_exception = True
@@ -55,6 +56,10 @@ if len(sys.argv) >= 1 and sys.argv[0] == '--break-on-systemexit-zero':
     
 if len(sys.argv) >= 1 and sys.argv[0] == '--debug-stdlib':
     debug_stdlib = True
+    del sys.argv[0]
+
+if len(sys.argv) >= 1 and sys.argv[0] == '--profile':
+    debug_profile = True
     del sys.argv[0]
 
 if len(sys.argv) >= 1 and sys.argv[0] == '--django-debugging':
@@ -80,4 +85,5 @@ visualstudio_py_debugger.debug(__file__,
                                 wait_on_exit,
                                 break_on_systemexit_zero,
                                 debug_stdlib,
+                                debug_profile,
                                 django_debugging)

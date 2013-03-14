@@ -93,6 +93,10 @@ class DebuggerTask(Task):
                                       enabled_name = 'debug_process.readyToDebug',
                                       image=ImageResource('debugger_step_out')),
                            image_size = (24, 24)),
+                  SToolBar(TaskAction(method='debug_profile',
+                                      tooltip='Run program with cProfile',
+                                      enabled_name = 'ready_to_debug',
+                                      image=ImageResource('debugger_profile')))
                 ]
 
     ###########################################################################
@@ -226,6 +230,14 @@ class DebuggerTask(Task):
         """
         thread = self.debug_process._threads.values()[0]
         thread.StepOut()
+
+    def debug_profile(self):
+        """ Run the application under cProfile
+        """
+        editor = self.active_editor
+        # Get new debug process
+        self.debug_process = self.debugger_service.debug()
+        self.debug_process.Profile(editor.path)
 
     @on_trait_change('debug_process:completedDebugging')
     def completed_debugging(self):

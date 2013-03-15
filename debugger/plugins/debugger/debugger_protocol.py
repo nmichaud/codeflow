@@ -32,6 +32,8 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
     structFormat = "!I"
     prefixLength = struct.calcsize(structFormat)
 
+    MAX_LENGTH = 2e32
+
     def __init__(self, factory):
         self.factory = factory
 
@@ -46,6 +48,9 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         code = msg[:4]
         # Dispatch code
         getattr(self, 'receive_%s'%code)(msg[4:])
+
+    def lengthLimitExceeded(self, length):
+        PyToolsProtocol.lengthLimitExceeded(self, length)
 
     # Debugger commands to send
     # None of the commands sent to the debugger are length prefixed messages

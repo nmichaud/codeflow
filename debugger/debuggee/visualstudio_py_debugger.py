@@ -2023,7 +2023,7 @@ def debug(file, port_num, debug_id, globals_obj, locals_obj, wait_on_exception, 
     if not debug_profile:
         sys.settrace(cur_thread.trace_func)
     else:
-        CPROFILER.enable()
+        CPROFILER.enable(DEBUG_STDLIB)
 
     # now execute main file
     try:

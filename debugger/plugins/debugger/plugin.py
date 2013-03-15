@@ -40,8 +40,6 @@ class DebuggerPlugin(Plugin):
     # Protected interface.
     ###########################################################################
 
-    debug_port = Int(8000)
-
     _debugger_service = Any()
 
     #def _preferences_default(self):
@@ -78,9 +76,10 @@ class DebuggerPlugin(Plugin):
         from ..twisted.ireactor import IReactorTCP
 
         # Get the twisted reactor from the reactor plugin
-        self._debugger_service = service = DebuggerService(port=self.debug_port)
+        self._debugger_service = service = DebuggerService()
 
         reactor = self.application.get_service(IReactorTCP)
-        reactor.listenTCP(self.debug_port, service)
+        port = reactor.listenTCP(0, service)
+        service.port = port.getHost().port
         return service
 

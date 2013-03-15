@@ -44,12 +44,8 @@ from twisted.python import log, runtime
 from twisted.internet import posixbase
 from twisted.python.runtime import platformType, platform
 
-try:
-    from PyQt4.QtCore import QSocketNotifier, QObject, SIGNAL, QTimer, QCoreApplication
-    from PyQt4.QtCore import QEventLoop
-except ImportError:
-    from PySide.QtCore import QSocketNotifier, QObject, SIGNAL, QTimer, QCoreApplication
-    from PySide.QtCore import QEventLoop
+from pyface.qt.QtCore import QSocketNotifier, QObject, SIGNAL, QTimer, QCoreApplication
+from pyface.qt.QtCore import QEventLoop
 
 
 class TwistedSocketNotifier(QObject):

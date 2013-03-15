@@ -242,7 +242,7 @@ class PyToolsProtocol(HasTraits, IntNStringReceiver):
         self._write_string(filename)
         self.transport.write(struct.pack('!I', len(statements)))
         for statement in statements:
-            self.transport.write(struct.pack('!II', statement.start, statement.end))
+            self.transport.write(struct.pack('!iI', statement.start, statement.end))
             self._write_string(statement.text)
 
     def send_BKDR(self):

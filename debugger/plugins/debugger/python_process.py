@@ -19,6 +19,7 @@ class PythonProcess(HasStrictTraits):
     _breakpoints = Dict() #(int, PythonBreakpoint)
 
     protocol = Instance(PyToolsProtocol)
+    port = Int()
 
     readyToDebug = Bool(False)
 
@@ -104,8 +105,8 @@ class PythonProcess(HasStrictTraits):
 
         args = [sys.executable,
                 os.path.join(os.path.dirname(__file__), '..', '..', 'debuggee', 'visualstudio_py_launcher.py'),
-                os.getcwd(),
-                '8000',
+                os.path.dirname(filename),
+                str(self.port),
                 str(self._processGuid),
                 #'--wait-on-exception',
                 #'--wait-on-exit',

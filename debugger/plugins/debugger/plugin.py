@@ -78,7 +78,7 @@ class DebuggerPlugin(Plugin):
         from ..twisted.ireactor import IReactorTCP
 
         # Get the twisted reactor from the reactor plugin
-        self._debugger_service = service = DebuggerService()
+        self._debugger_service = service = DebuggerService(port=self.debug_port)
 
         reactor = self.application.get_service(IReactorTCP)
         reactor.listenTCP(self.debug_port, service)

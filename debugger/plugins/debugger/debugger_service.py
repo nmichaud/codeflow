@@ -1,7 +1,7 @@
 import uuid
 
 # Enthought library imports
-from traits.api import HasTraits, Bool, Instance, Dict
+from traits.api import HasTraits, Bool, Instance, Dict, Int
 
 # Local imports
 from python_process import PythonProcess
@@ -14,12 +14,14 @@ class DebuggerService(HasTraits, ServerFactory):
 
     processes = Dict(uuid.UUID, PythonProcess)
 
+    port = Int()
+
     def stop_service(self):
         for process in self.processes.values():
             process.Terminate()
 
     def debug(self):
-        process = PythonProcess()
+        process = PythonProcess(port=self.port)
         # Add to internal cache before starting
         self.processes[process.ProcessGuid] = process
         return process
